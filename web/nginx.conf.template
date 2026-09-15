@@ -1,0 +1,22 @@
+server {
+    # ${PORT} / ${API_ORIGIN} are substituted by the official nginx image's built-in
+    # envsubst-on-templates entrypoint (files under /etc/nginx/templates/*.template).
+    # It only replaces names that are actually set as environment variables, so nginx's
+    # own runtime vars ($host, $uri, ...) below are left untouched.
+    listen ${PORT};
+
+    location /api/ {
+        proxy_pass ${API_ORIGIN};
+        proxy_set_header Host $host;
+    }
+
+    location /webhooks/ {
+        proxy_pass ${API_ORIGIN};
+        proxy_set_header Host $host;
+    }
+
+    location / {
+        root /usr/share/nginx/html;
+        try_files $uri $uri/ /index.html;
+    }
+}

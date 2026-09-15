@@ -1,0 +1,68 @@
+using Dapper;
+using Npgsql;
+using SabemiTec.Api.Persistence.Sql;
+
+namespace SabemiTec.Api.Features.Dashboard.Repositories;
+
+/// <summary>Read-only — no IUnitOfWork here on purpose: opening a transaction for a SELECT
+/// would just be noise. Connects directly through the NpgsqlDataSource.</summary>
+internal sealed class PaymentQueryRepository(NpgsqlDataSource dataSource) : IPaymentQueryRepository
+{
+    public async Task<(IReadOnlyList<PaymentListItem> Items, bool HasMore)> SearchAsync(PaymentQuery query, CancellationToken ct)
+    {
+        var predicates = new List<string>();
+        var parameters = new DynamicParameters();
+
+        // Fragments are code-level constants; every value goes through DynamicParameters —
+        // never string interpolation of user input.
+        if (!string.IsNullOrWhiteSpace(query.Status))
+        {
+            predicates.Add("effective_status = @Status");
+            parameters.Add("Status", query.Status);
+        }
+
+        if (!string.IsNullOrWhiteSpace(query.ContractId))
+        {
+            predicates.Add("contract_id ilike @ContractPrefix");
+            parameters.Add("ContractPrefix", query.ContractId + "%");
+        }
+
+        var page = Math.Max(query.Page, 1);
+        var pageSize = Math.Clamp(query.PageSize, 1, 100);
+
+        // Fetch one extra row instead of a second COUNT(*) query: cheaper, and all we need
+        // is "is there more", not an exact total.
+        parameters.Add("Limit", pageSize + 1);
+        parameters.Add("Offset", (page - 1) * pageSize);
+
+        var sql = PaymentQuerySql.SelectBase
+            + (predicates.Count > 0 ? " where " + string.Join(" and ", predicates) : "")
+            + " order by received_at desc, id desc limit @Limit offset @Offset;";
+
+        await using var conn = await dataSource.OpenConnectionAsync(ct);
+        var cmd = new CommandDefinition(sql, parameters, cancellationToken: ct);
+        var rows = (await conn.QueryAsync<PaymentListItem>(cmd)).AsList();
+
+        var hasMore = rows.Count > pageSize;
+        if (hasMore)
+        {
+            rows.RemoveAt(rows.Count - 1);
+        }
+
+        return (rows, hasMore);
+    }
+
+    public async Task<PaymentDetail?> FindByIdAsync(long id, CancellationToken ct)
+    {
+        await using var conn = await dataSource.OpenConnectionAsync(ct);
+        var cmd = new CommandDefinition(PaymentQuerySql.FindById, new { Id = id }, cancellationToken: ct);
+        return await conn.QuerySingleOrDefaultAsync<PaymentDetail>(cmd);
+    }
+
+    public async Task<PaymentStats> GetStatsAsync(CancellationToken ct)
+    {
+        await using var conn = await dataSource.OpenConnectionAsync(ct);
+        var cmd = new CommandDefinition(PaymentQuerySql.Stats, cancellationToken: ct);
+        return await conn.QuerySingleAsync<PaymentStats>(cmd);
+    }
+}

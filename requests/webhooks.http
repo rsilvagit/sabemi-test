@@ -1,0 +1,114 @@
+@host = http://localhost:8080
+@apikey = dev-local-key
+
+### 1. Valid payment -> 202 Accepted
+POST {{host}}/webhooks/pagamento
+Content-Type: application/json
+X-Api-Key: {{apikey}}
+
+{
+  "id_transacao": "TX-001",
+  "id_contrato": "CT-42",
+  "valor": 1250.50,
+  "data_pagamento": "2026-09-15T10:00:00Z",
+  "status": "PAGO"
+}
+
+### 2. Same id_transacao again -> 200 OK, duplicate: true
+POST {{host}}/webhooks/pagamento
+Content-Type: application/json
+X-Api-Key: {{apikey}}
+
+{
+  "id_transacao": "TX-001",
+  "id_contrato": "CT-42",
+  "valor": 1250.50,
+  "data_pagamento": "2026-09-15T10:00:00Z",
+  "status": "PAGO"
+}
+
+### 3. Missing ApiKey -> 401
+POST {{host}}/webhooks/pagamento
+Content-Type: application/json
+
+{
+  "id_transacao": "TX-002",
+  "id_contrato": "CT-42",
+  "valor": 100,
+  "data_pagamento": "2026-09-15T10:00:00Z",
+  "status": "PAGO"
+}
+
+### 4. Invalid ApiKey -> 401
+POST {{host}}/webhooks/pagamento
+Content-Type: application/json
+X-Api-Key: wrong-key
+
+{
+  "id_transacao": "TX-003",
+  "id_contrato": "CT-42",
+  "valor": 100,
+  "data_pagamento": "2026-09-15T10:00:00Z",
+  "status": "PAGO"
+}
+
+### 5. Invalid payload (negative amount) -> 400, but persisted as Rejected
+POST {{host}}/webhooks/pagamento
+Content-Type: application/json
+X-Api-Key: {{apikey}}
+
+{
+  "id_transacao": "TX-004",
+  "id_contrato": "CT-42",
+  "valor": -5,
+  "data_pagamento": "2026-09-15T10:00:00Z",
+  "status": "PAGO"
+}
+
+### 6. Second payment on the same contract -> check the sum in contract_status
+POST {{host}}/webhooks/pagamento
+Content-Type: application/json
+X-Api-Key: {{apikey}}
+
+{
+  "id_transacao": "TX-005",
+  "id_contrato": "CT-42",
+  "valor": 300.00,
+  "data_pagamento": "2026-09-16T10:00:00Z",
+  "status": "PAGO"
+}
+
+### 7. Malformed JSON -> 400, not persisted
+POST {{host}}/webhooks/pagamento
+Content-Type: application/json
+X-Api-Key: {{apikey}}
+
+{ this is not json }
+
+### 8. Missing id_transacao -> 400, persisted with a synthetic key (MISSING:...)
+POST {{host}}/webhooks/pagamento
+Content-Type: application/json
+X-Api-Key: {{apikey}}
+
+{
+  "id_contrato": "CT-42",
+  "valor": 100,
+  "data_pagamento": "2026-09-15T10:00:00Z",
+  "status": "PAGO"
+}
+
+### 9. Rate limit: fire this same request 250+ times fast (manually or with a script) to
+### exceed the token bucket (default TokenLimit=200) -> 429 with a Retry-After header.
+### Retrying the same id_transacao afterwards is still accepted exactly once — 429 never
+### persists anything, so it never breaks idempotency.
+POST {{host}}/webhooks/pagamento
+Content-Type: application/json
+X-Api-Key: {{apikey}}
+
+{
+  "id_transacao": "TX-RATE-LIMIT-DEMO",
+  "id_contrato": "CT-42",
+  "valor": 10,
+  "data_pagamento": "2026-09-15T10:00:00Z",
+  "status": "PAGO"
+}
