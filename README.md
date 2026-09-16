@@ -37,8 +37,13 @@ depois — é o processamento assíncrono em ação.
 Pra ver o dashboard [em produção](https://sabemi-web.onrender.com) se movendo sozinho em vez
 de gerar eventos manualmente, rode localmente o worker `load-simulator` — ele faz o papel do
 banco parceiro, disparando um **lote de transações concorrentes** (`CONCURRENT_REQUESTS`, 5
-por padrão) a cada 25s contra `POST /webhooks/payment`, com uma mistura de pagamentos
-válidos e payloads inválidos, contra a API de staging no Render:
+por padrão) a cada 25s contra `POST /webhooks/payment`, contra a API de staging no Render.
+Busca a lista de contratos reais em `GET /api/payments/contracts` no startup (com retry, já
+que a API pode não estar pronta ainda) em vez de hardcoded, pra nunca divergir do que está
+seedado. Mistura payloads válidos (`PAGO`/`FALHA`) e inválidos — `id_transacao` ausente,
+`status` desconhecido — pra exercitar o caminho de erro de validação. Sem cenário de valor
+negativo: é um dashboard de liquidação de parcela, não de movimentação de conta, então não
+existe "saque" nesse domínio.
 
 ```bash
 STG_WEBHOOK_API_KEY=<chave real do Webhook__ApiKey do sabemi-api> \
@@ -223,14 +228,64 @@ de uma variável bakeada no bundle JS em build time (`VITE_API_KEY`, ver
 foi um segredo forte (é só um filtro contra scraping casual, já era isso mesmo quando só o
 proxy a conhecia), e a alternativa — desistir da auth no `GET` — seria pior.
 
-### Vertical slice
+### Vertical slice, não Clean Architecture / DDD tático / hexagonal
 
 `Features/<Webhooks|Processing|Dashboard>/` agrupa por caso de uso, não por camada técnica —
-cada serviço esta contido em uma feature. Descartado deliberadamente:
+cada requisito do PDF mora inteiro numa pasta. Descartado deliberadamente:
+
+- **Camadas por assembly** (`Api`/`Application`/`Infrastructure`) dariam uma implementação
+  por abstração num serviço com um endpoint de escrita e dois de leitura.
+- **DDD tático** (agregados, value objects) não se aplica: a única invariante de negócio
+  (soma do contrato) é correta porque vive no `ON CONFLICT DO UPDATE` do SQL, não porque um
+  agregado a protege.
+- **Hexagonal** paga quando há múltiplos adaptadores de cada lado. Aqui há um driving (HTTP)
+  e um driven (Postgres); a ACL já cumpre o papel de porta onde de fato existe um adaptador
+  plausível (um segundo banco parceiro).
 
 Convenção de DI: `Configurations/Extensions/ServicesExtensions.cs` concentra métodos `AddX`
 por área, encadeados fluentemente no `Program.cs` — nenhum `services.AddScoped<>()` solto.
 
+### Erro de validação vs. falha de pagamento — mesmo badge "Erro", rótulo diferente
+
+O badge "Erro" cobre dois casos bem diferentes: payload malformado (nunca chegou a um
+resultado de negócio) e payload processado com sucesso mas rejeitado pelo banco
+(`payment_status = FALHA`). Um campo derivado, `error_category`
+(`Validation` | `PaymentFailure` | `null`, calculado em SQL junto com `effective_status`),
+faz o dashboard mostrar "Erro de validação" ou "Falha de pagamento" em vez de um "Erro"
+genérico — mesma cor/pill, texto diferente. O filtro Sucesso/Erro/Pendente do topo continua
+exatamente como o PDF pede; a distinção é só visual dentro do badge.
+
+### Dado de demonstração: tipo de contrato, parcela e valor total
+
+O enunciado fala em "liquidação de seguros ou parcelas de empréstimos", mas o payload do
+webhook não carrega tipo de contrato, número de parcelas nem valor total — só
+`id_transacao, id_contrato, valor, data_pagamento, status`. Em vez de inventar isso por
+evento (a mesma armadilha já descartada com um campo de "método de pagamento" que o banco
+nunca envia), existe uma tabela `contract` **seedada manualmente** (migrations `0002` e
+`0003`) com 8 contratos fake, cada um com tipo (`Emprestimo`/`Seguro`), total de parcelas e
+valor total — deixado explícito no código e na UI (tooltip no header da coluna) que é dado
+de demonstração, não algo que o banco parceiro informa.
+
+A partir daí, o dashboard mostra, por `LEFT JOIN` com essa tabela:
+- **Tipo de Contrato** na tabela principal, formatado como `Empréstimo (3/12)` — o número da
+  parcela é calculado com `row_number() over (partition by contract_id order by
+  received_at)`, **em módulo do total de parcelas** (`((posição - 1) % installments) + 1`):
+  sem o módulo, o número cresceria sem limite conforme o `load-simulator` gera tráfego
+  contínuo pros mesmos 8 contratos (chegou a mostrar `262/24` antes do fix) — com módulo ele
+  cicla de volta pro 1 depois do total, como um contrato "recomeçando".
+- **Valor total do contrato** só no detalhamento expandido.
+- Filtro de contrato: **dropdown** com os contratos reais (`GET /api/payments/contracts`),
+  não texto livre — elimina digitar um ID errado ou inexistente.
+- Filtro por **Tipo de Contrato** (Empréstimo/Seguro) na `FiltersBar`.
+
+### Detalhamento expansível pra qualquer status, não só erro
+
+Clicar em qualquer linha da tabela (Sucesso, Erro ou Pendente) expande um painel com os
+dados que o banco mandou — cor do painel acompanha o status (verde/vermelho/âmbar). Antes só
+linhas de erro expandiam; não tinha razão pra restringir, já que confirmar os dados de uma
+transação bem-sucedida é tão útil quanto investigar uma com problema. `Processado em` saiu
+da visão geral da tabela (ficava redundante ali) e só aparece no detalhamento, junto com
+`Recebido em` pra dar o contexto completo do ciclo de vida do evento.
 
 ### Frontend: polling
 
@@ -403,8 +458,9 @@ src/SabemiTec.Api/
 ├── Features/
 │   ├── Webhooks/           # POST /webhooks/payment — ingestão + idempotência
 │   ├── Processing/         # worker: claim, delay, upsert, retry/dead-letter
-│   └── Dashboard/          # GET /api/payments — leitura, filtros, stats
+│   └── Dashboard/          # GET /api/payments(/stats|/contracts|/{id}) — leitura, filtros, stats
 ├── Database/PostgreSQL/    # IUnitOfWork, Dapper, SQL, migrations (DbUp)
+│   └── Migrations/Scripts/ # 0001 schema · 0002 seed de contract (demo) · 0003 total_value (demo)
 ├── Middlewares/            # ApiKeyAuthMiddleware
 └── Configurations/         # DI, RateLimiting, mapeamento de rotas
 
