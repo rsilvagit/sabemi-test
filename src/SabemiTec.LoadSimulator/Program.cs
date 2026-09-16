@@ -60,20 +60,20 @@ return;
 
 // The API container may not be reachable yet on cold start (compose brings services up in
 // parallel), so this retries a handful of times before giving up. If the endpoint is
-// unreachable, falls back to a fixed list matching migrations 0002/0003 exactly — keeps the
-// worker usable and still consistent, just without the drift protection a live fetch gives.
+// unreachable, falls back to a fixed list matching migrations 0002/0003/0004 exactly — keeps
+// the worker usable and still consistent, just without the drift protection a live fetch gives.
 static async Task<ContractInfo[]> FetchContractsAsync(HttpClient client, JsonSerializerOptions jsonOptions, CancellationToken ct)
 {
     ContractInfo[] fallback =
     [
         new("CT-1001", "Emprestimo", 12, 6000.00m),
-        new("CT-1002", "Seguro", null, 1200.00m),
+        new("CT-1002", "Seguro", 12, 1200.00m),
         new("CT-1003", "Emprestimo", 24, 14400.00m),
-        new("CT-1004", "Seguro", null, 2400.00m),
+        new("CT-1004", "Seguro", 24, 2400.00m),
         new("CT-1005", "Emprestimo", 6, 3000.00m),
-        new("CT-1006", "Seguro", null, 900.00m),
+        new("CT-1006", "Seguro", 6, 900.00m),
         new("CT-1007", "Emprestimo", 36, 21600.00m),
-        new("CT-1008", "Seguro", null, 1800.00m),
+        new("CT-1008", "Seguro", 12, 1800.00m),
     ];
 
     for (var attempt = 1; attempt <= 5; attempt++)
