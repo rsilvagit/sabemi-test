@@ -40,19 +40,20 @@ services:
     depends_on:
       - api
 
-  # Opt-in: `docker compose --profile simulator up` to keep the dashboard showing live
-  # movement. Off by default so a plain `docker compose up` stays quiet.
+  # Opt-in: STG_WEBHOOK_API_KEY=<chave real do sabemi-api> docker compose --profile simulator up -d --build
+  # Off by default so a plain `docker compose up` stays quiet. Points at the staging API
+  # deployed on Render (not the local `api` container) — no Render Background Worker to pay
+  # for, you just run this on your own machine whenever you want the demo dashboard moving.
+  # Override LOAD_SIMULATOR_API_URL to target the local `api` container instead.
   load-simulator:
     profiles: ["simulator"]
     build:
       context: .
       dockerfile: src/SabemiTec.LoadSimulator/Dockerfile
     environment:
-      API_URL: "http://api:8080"
-      WEBHOOK_API_KEY: ${WEBHOOK_API_KEY:-dev-local-key}
+      API_URL: ${LOAD_SIMULATOR_API_URL:-https://sabemi-api.onrender.com}
+      WEBHOOK_API_KEY: ${STG_WEBHOOK_API_KEY:?defina STG_WEBHOOK_API_KEY com a chave real do sabemi-api (Webhook__ApiKey no Render)}
       INTERVAL_SECONDS: "5"
-    depends_on:
-      - api
 
 volumes:
   pgdata:
