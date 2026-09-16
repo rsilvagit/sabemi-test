@@ -4,17 +4,15 @@ import { LiveIndicator } from '../components/LiveIndicator'
 import { Pagination } from '../components/Pagination'
 import { PaymentsTable } from '../components/PaymentsTable'
 import { StatsCards } from '../components/StatsCards'
+import { useDashboardData } from '../hooks/useDashboardData'
 import { usePaymentFilters } from '../hooks/usePaymentFilters'
-import { usePayments } from '../hooks/usePayments'
-import { usePaymentStats } from '../hooks/usePaymentStats'
 
 export function Dashboard() {
   const { filters, setStatus, setContractId, setPage, clear, hasActiveFilters } =
     usePaymentFilters()
   const [autoRefresh, setAutoRefresh] = useState(true)
 
-  const { data, isLoading, isError } = usePayments(filters, autoRefresh)
-  const { data: stats } = usePaymentStats(autoRefresh)
+  const { data, isLoading, isError } = useDashboardData(filters, autoRefresh)
 
   return (
     <div className="min-h-screen bg-[#eef2f7]">
@@ -29,7 +27,7 @@ export function Dashboard() {
       </header>
 
       <main className="mx-auto max-w-6xl space-y-4 px-6 py-8">
-        <StatsCards stats={stats} activeStatus={filters.status} onSelect={setStatus} />
+        <StatsCards stats={data?.stats} activeStatus={filters.status} onSelect={setStatus} />
 
         <FiltersBar
           status={filters.status}
@@ -40,10 +38,18 @@ export function Dashboard() {
           onClear={clear}
         />
 
-        <PaymentsTable items={data?.items ?? []} isLoading={isLoading} isError={isError} />
+        <PaymentsTable
+          items={data?.payments.items ?? []}
+          isLoading={isLoading}
+          isError={isError}
+        />
 
         {data && (
-          <Pagination page={filters.page} hasMore={data.hasMore} onPageChange={setPage} />
+          <Pagination
+            page={filters.page}
+            hasMore={data.payments.hasMore}
+            onPageChange={setPage}
+          />
         )}
       </main>
     </div>
