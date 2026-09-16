@@ -8,8 +8,11 @@ using System.Text.Json;
 // process/service, independent from the API and the dashboard.
 
 var apiUrl = Environment.GetEnvironmentVariable("API_URL") ?? "http://localhost:8080";
-var apiKey = Environment.GetEnvironmentVariable("WEBHOOK_API_KEY")
-    ?? throw new InvalidOperationException("WEBHOOK_API_KEY is required.");
+var apiKey = Environment.GetEnvironmentVariable("WEBHOOK_API_KEY");
+if (string.IsNullOrEmpty(apiKey))
+{
+    throw new InvalidOperationException("WEBHOOK_API_KEY is required.");
+}
 var intervalSeconds = int.TryParse(Environment.GetEnvironmentVariable("INTERVAL_SECONDS"), out var parsed)
     ? parsed
     : 5;

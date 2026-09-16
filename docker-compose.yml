@@ -52,7 +52,11 @@ services:
       dockerfile: src/SabemiTec.LoadSimulator/Dockerfile
     environment:
       API_URL: ${LOAD_SIMULATOR_API_URL:-https://sabemi-api.onrender.com}
-      WEBHOOK_API_KEY: ${STG_WEBHOOK_API_KEY:?defina STG_WEBHOOK_API_KEY com a chave real do sabemi-api (Webhook__ApiKey no Render)}
+      # No hard-required (`:?`) default here on purpose: Compose validates every service's
+      # interpolation up front regardless of active profile, so that would break a plain
+      # `docker compose up` (no --profile simulator) too. Left empty, the container itself
+      # (only started when the profile is active) fails fast with a clear message instead.
+      WEBHOOK_API_KEY: ${STG_WEBHOOK_API_KEY:-}
       INTERVAL_SECONDS: "5"
 
 volumes:
