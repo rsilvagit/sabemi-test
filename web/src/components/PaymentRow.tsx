@@ -16,7 +16,9 @@ export function PaymentRow({ item }: { item: PaymentListItem }) {
           isError ? 'border-l-4 border-l-red-500 bg-red-50' : 'hover:bg-gray-50'
         }`}
       >
-        <td className="px-4 py-3 font-mono text-xs text-gray-600">{item.transactionId}</td>
+        <td className="px-4 py-3 font-mono text-xs text-gray-600">
+          {item.transactionId.startsWith('MISSING:') ? 'Não informada' : item.transactionId}
+        </td>
         <td className="px-4 py-3 text-primary-700">{item.contractId ?? '—'}</td>
         <td className="px-4 py-3">{formatCurrency(item.amount)}</td>
         <td className="px-4 py-3">

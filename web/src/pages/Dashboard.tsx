@@ -24,11 +24,7 @@ export function Dashboard() {
             <h1 className="min-w-0 text-xl font-bold text-gray-900">Sabemi — Pagamentos</h1>
             <LiveIndicator active={autoRefresh} onToggle={() => setAutoRefresh((v) => !v)} />
           </div>
-          <p className="mt-1 max-w-2xl text-sm text-gray-500">
-            Notificações do banco parceiro. O processamento é assíncrono — um evento novo
-            aparece como <span className="font-medium">Pendente</span> e muda sozinho em
-            alguns segundos.
-          </p>
+          <p className="mt-1 max-w-2xl text-sm text-gray-500">Webhooks do banco parceiro</p>
         </div>
       </header>
 
