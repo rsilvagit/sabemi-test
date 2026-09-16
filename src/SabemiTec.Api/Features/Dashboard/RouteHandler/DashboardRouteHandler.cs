@@ -1,3 +1,4 @@
+using SabemiTec.Api.Features.Dashboard.DTO;
 using SabemiTec.Api.Features.Dashboard.Repositories;
 
 namespace SabemiTec.Api.Features.Dashboard.RouteHandler;
@@ -38,13 +39,11 @@ public static class DashboardRouteHandler
         var query = new PaymentQuery(status, contractId, page <= 0 ? 1 : page, pageSize <= 0 ? 25 : pageSize);
         var (items, hasMore) = await repository.SearchAsync(query, ct);
 
-        return Results.Ok(new
-        {
-            items = items.Select(ToDto),
-            page = query.Page,
-            pageSize = query.PageSize,
-            hasMore
-        });
+        return Results.Ok(new SearchPaymentsResponse(
+            items.Select(ToDto).ToList(),
+            query.Page,
+            query.PageSize,
+            hasMore));
     }
 
     private static async Task<IResult> GetByIdAsync(long id, IPaymentQueryRepository repository, CancellationToken ct)
@@ -56,47 +55,37 @@ public static class DashboardRouteHandler
     private static async Task<IResult> GetStatsAsync(IPaymentQueryRepository repository, CancellationToken ct)
     {
         var stats = await repository.GetStatsAsync(ct);
-        return Results.Ok(new
-        {
-            total = stats.Total,
-            success = stats.Success,
-            error = stats.Error,
-            pending = stats.Pending
-        });
+        return Results.Ok(new PaymentStatsDto(stats.Total, stats.Success, stats.Error, stats.Pending));
     }
 
-    private static object ToDto(PaymentListItem item) => new
-    {
-        id = item.Id,
-        transactionId = item.TransactionId,
-        contractId = item.ContractId,
-        amount = item.Amount,
-        paymentDate = item.PaymentDate,
-        paymentStatus = item.PaymentStatus,
-        processingStatus = item.ProcessingStatus,
-        effectiveStatus = item.EffectiveStatus,
-        attempts = item.Attempts,
-        lastError = item.LastError,
-        validationError = item.ValidationError,
-        receivedAt = item.ReceivedAt,
-        processedAt = item.ProcessedAt
-    };
+    private static PaymentListItemDto ToDto(PaymentListItem item) => new(
+        item.Id,
+        item.TransactionId,
+        item.ContractId,
+        item.Amount,
+        item.PaymentDate,
+        item.PaymentStatus,
+        item.ProcessingStatus,
+        item.EffectiveStatus,
+        item.Attempts,
+        item.LastError,
+        item.ValidationError,
+        item.ReceivedAt,
+        item.ProcessedAt);
 
-    private static object ToDetailDto(PaymentDetail item) => new
-    {
-        id = item.Id,
-        transactionId = item.TransactionId,
-        contractId = item.ContractId,
-        amount = item.Amount,
-        paymentDate = item.PaymentDate,
-        paymentStatus = item.PaymentStatus,
-        processingStatus = item.ProcessingStatus,
-        effectiveStatus = item.EffectiveStatus,
-        attempts = item.Attempts,
-        lastError = item.LastError,
-        validationError = item.ValidationError,
-        receivedAt = item.ReceivedAt,
-        processedAt = item.ProcessedAt,
-        rawPayload = item.Payload
-    };
+    private static PaymentDetailDto ToDetailDto(PaymentDetail item) => new(
+        item.Id,
+        item.TransactionId,
+        item.ContractId,
+        item.Amount,
+        item.PaymentDate,
+        item.PaymentStatus,
+        item.ProcessingStatus,
+        item.EffectiveStatus,
+        item.Attempts,
+        item.LastError,
+        item.ValidationError,
+        item.ReceivedAt,
+        item.ProcessedAt,
+        item.Payload);
 }
