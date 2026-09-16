@@ -31,6 +31,7 @@ export function PaymentsTable({ items, isLoading, isError }: PaymentsTableProps)
         <thead>
           <tr className="border-b border-gray-200 bg-gray-50 text-xs font-semibold text-gray-500 uppercase">
             <th className="px-4 py-3">Transação</th>
+            <th className="px-4 py-3">Tipo</th>
             <th className="px-4 py-3">Contrato</th>
             <th className="px-4 py-3">Valor</th>
             <th className="px-4 py-3">Status</th>
