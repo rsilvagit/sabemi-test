@@ -223,40 +223,10 @@ de uma variável bakeada no bundle JS em build time (`VITE_API_KEY`, ver
 foi um segredo forte (é só um filtro contra scraping casual, já era isso mesmo quando só o
 proxy a conhecia), e a alternativa — desistir da auth no `GET` — seria pior.
 
-### Deploy no Render: por que o dashboard chama a API direto, não via proxy nginx
-
-O plano original era o nginx do `sabemi-web` proxyar `/api` até o `sabemi-api` (mesmo
-mecanismo do docker-compose, evitando CORS). No Render isso **não funcionou**: a conexão
-HTTPS de um serviço para o outro falha com `SSL_do_handshake() failed ... alert handshake
-failure` contra o próprio edge do Render, independente de DNS por request + SNI corretos
-(`proxy_ssl_server_name`). A rede privada entre serviços (`http://sabemi-api:10000`) também
-não resolveu (`host not found in upstream`) no plano Free testado. Diante disso, o
-`sabemi-web` chama a API pelo endereço público diretamente do browser (CORS), e o nginx
-local continua fazendo proxy normalmente — só a build do Render é diferente (`VITE_API_ORIGIN`
-setado no CI). Documentado aqui para não repetir a investigação se alguém tentar voltar pro
-proxy: pode valer a pena revisitar com um plano pago do Render (rede privada costuma exigir
-isso) ou abrindo um ticket de suporte perguntando o hostname interno correto.
-
-O ponto que mais importa: **o 429 acontece antes de qualquer persistência**, então o reenvio
-que ele provoca cai no mesmo caminho idempotente de sempre — nunca há "throttle por
-idempotência" nem duplicata contabilizada por causa de um 429. Provado em
-`RateLimitingTests`: uma rajada estoura o limite, e reenviar a transação rejeitada resulta em
-exatamente uma linha no banco.
-
 ### Vertical slice, não Clean Architecture / DDD tático / hexagonal
 
 `Features/<Webhooks|Processing|Dashboard>/` agrupa por caso de uso, não por camada técnica —
-cada requisito do PDF mora inteiro numa pasta. Descartado deliberadamente:
-
-- **Camadas por assembly** (`Api`/`Application`/`Infrastructure`) dariam uma implementação
-  por abstração num serviço com um endpoint de escrita e dois de leitura.
-- **DDD tático** (agregados, value objects) não se aplica: a única invariante de negócio
-  (soma do contrato) é correta porque vive no `ON CONFLICT DO UPDATE` do SQL, não porque um
-  agregado a protege — modelar isso como agregado rico reintroduziria o problema de
-  concorrência que o SQL já resolve.
-- **Hexagonal** paga quando há múltiplos adaptadores de cada lado. Aqui há um driving (HTTP)
-  e um driven (Postgres); a ACL já cumpre o papel de porta onde de fato existe um adaptador
-  plausível (um segundo banco parceiro).
+cada serviço esta contido em uma feature. Descartado deliberadamente:
 
 Convenção de DI: `Configurations/Extensions/ServicesExtensions.cs` concentra métodos `AddX`
 por área, encadeados fluentemente no `Program.cs` — nenhum `services.AddScoped<>()` solto.
@@ -275,7 +245,7 @@ campo derivado, `effectiveStatus`, calculado em SQL:
 | processado e `payment_status = PAGO` | `Success` |
 | processado mas `payment_status ≠ PAGO` | `Error` |
 
-### Frontend: polling, não SSE/WebSocket
+### Frontend: polling
 
 O enunciado aceita "tempo real **ou** via refresh". Polling de 5s (TanStack Query,
 `keepPreviousData` para a tabela não piscar a cada atualização) entrega o mesmo valor
