@@ -266,21 +266,28 @@ O enunciado fala em "liquidação de seguros ou parcelas de empréstimos", mas o
 webhook não carrega tipo de contrato, número de parcelas nem valor total — só
 `id_transacao, id_contrato, valor, data_pagamento, status`. Em vez de inventar isso por
 evento (a mesma armadilha já descartada com um campo de "método de pagamento" que o banco
-nunca envia), existe uma tabela `contract` **seedada manualmente** (migrations `0002` e
-`0003`) com 8 contratos fake, cada um com tipo (`Emprestimo`/`Seguro`), total de parcelas e
-valor total — deixado explícito no código e na UI (tooltip no header da coluna) que é dado
-de demonstração, não algo que o banco parceiro informa.
+nunca envia), existe uma tabela `contract` **seedada manualmente** (migrations `0002`,
+`0003`, `0004`) com 8 contratos fake, cada um com tipo (`Emprestimo`/`Seguro`), total de
+parcelas e valor total — deixado explícito no código que é dado de demonstração, não algo
+que o banco parceiro informa. Empréstimo e Seguro têm parcelamento (migration `0004`
+adicionou parcelas também ao Seguro, que antes era só um prêmio único — inconsistente com
+Empréstimo, sinalizado pelo usuário).
 
-A partir daí, o dashboard mostra, por `LEFT JOIN` com essa tabela:
-- **Tipo de Contrato** na tabela principal, formatado como `Empréstimo (3/12)` — o número da
-  parcela é calculado com `row_number() over (partition by contract_id order by
+A partir daí, por `LEFT JOIN` com essa tabela:
+- **Tipo de Contrato**, **Parcela** (`3/12`) e **Valor total do contrato** aparecem só no
+  detalhamento expandido — não na tabela principal, pra manter a visão geral enxuta.
+- O número da parcela é calculado com `row_number() over (partition by contract_id order by
   received_at)`, **em módulo do total de parcelas** (`((posição - 1) % installments) + 1`):
   sem o módulo, o número cresceria sem limite conforme o `load-simulator` gera tráfego
   contínuo pros mesmos 8 contratos (chegou a mostrar `262/24` antes do fix) — com módulo ele
   cicla de volta pro 1 depois do total, como um contrato "recomeçando".
-- **Valor total do contrato** só no detalhamento expandido.
-- Filtro de contrato: **dropdown** com os contratos reais (`GET /api/payments/contracts`),
-  não texto livre — elimina digitar um ID errado ou inexistente.
+- **`valor` de cada transação é consistente com o contrato**: `total_value / installments`
+  pra Empréstimo/Seguro com parcelamento, `total_value` direto se não houver. Sem isso o
+  `load-simulator` gerava um valor aleatório desconectado do contrato (ex.: uma "parcela" de
+  R$ 53,46 num empréstimo de R$ 6.000/12, que não fecha matematicamente — sinalizado pelo
+  usuário). `GET /api/payments/contracts` retorna o contrato completo (não só o ID) pra isso.
+- Filtro de contrato: **dropdown** com os contratos reais, não texto livre — elimina digitar
+  um ID errado ou inexistente.
 - Filtro por **Tipo de Contrato** (Empréstimo/Seguro) na `FiltersBar`.
 
 ### Detalhamento expansível pra qualquer status, não só erro
@@ -465,7 +472,7 @@ src/SabemiTec.Api/
 │   ├── Processing/         # worker: claim, delay, upsert, retry/dead-letter
 │   └── Dashboard/          # GET /api/payments(/stats|/contracts|/{id}) — leitura, filtros, stats
 ├── Database/PostgreSQL/    # IUnitOfWork, Dapper, SQL, migrations (DbUp)
-│   └── Migrations/Scripts/ # 0001 schema · 0002 seed de contract (demo) · 0003 total_value (demo)
+│   └── Migrations/Scripts/ # 0001 schema · 0002-0004 seed/ajustes de contract (demo)
 ├── Middlewares/            # ApiKeyAuthMiddleware
 └── Configurations/         # DI, RateLimiting, mapeamento de rotas
 
