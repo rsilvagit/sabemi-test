@@ -400,6 +400,15 @@ aplicação é sempre manual, disparado por você em *Actions*.
 
 ## Estrutura
 
+**Por que monorepo:** API, worker de carga sintética e dashboard vivem no mesmo repositório
+e compartilham o mesmo pipeline de CI/CD (um workflow de deploy por aplicação, mas todos no
+`.github/workflows/` deste repo). Isso é uma escolha deliberada **para este teste/PoC** —
+simplifica avaliação e onboarding, um único `git clone` + `docker compose up` sobe tudo. Não
+é a arquitetura que se levaria pra produção: lá, cada aplicação (`sabemi-api`, `sabemi-web`)
+teria **repositório próprio**, pipeline de CI/CD independente, e **ambientes segregados** de
+staging e produção (banco, secrets, URLs e Deploy Hooks distintos por ambiente — hoje só
+existe um ambiente de demo/staging compartilhado, sem produção real).
+
 ```
 src/SabemiTec.Api/
 ├── ACL/PartnerBank/        # fronteira com o payload do banco parceiro
