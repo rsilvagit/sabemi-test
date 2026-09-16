@@ -1,3 +1,4 @@
+using SabemiTec.Api.Configurations.RateLimiting;
 using SabemiTec.Api.Database.PostgreSQL;
 using SabemiTec.Api.Features.Dashboard.DTO;
 using SabemiTec.Api.Features.Dashboard.Repositories;
@@ -8,22 +9,30 @@ public static class DashboardRouteHandler
 {
     public static IEndpointRouteBuilder MapDashboardEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/payments").WithTags("Dashboard");
+        var group = app.MapGroup("/api/payments")
+            .RequireRateLimiting(RateLimitingSetup.DashboardPolicy)
+            .WithTags("Dashboard");
 
         group.MapGet("/", SearchAsync)
             .WithName("SearchPayments")
             .Produces(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status429TooManyRequests)
             .WithOpenApi();
 
         group.MapGet("/stats", GetStatsAsync)
             .WithName("GetPaymentStats")
             .Produces(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status429TooManyRequests)
             .WithOpenApi();
 
         group.MapGet("/{id:long}", GetByIdAsync)
             .WithName("GetPaymentById")
             .Produces(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status429TooManyRequests)
             .WithOpenApi();
 
         return app;

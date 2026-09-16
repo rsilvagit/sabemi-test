@@ -1,13 +1,18 @@
 server {
-    # ${PORT} / ${API_ORIGIN} are substituted by the official nginx image's built-in
-    # envsubst-on-templates entrypoint (files under /etc/nginx/templates/*.template).
-    # It only replaces names that are actually set as environment variables, so nginx's
-    # own runtime vars ($host, $uri, ...) below are left untouched.
+    # ${PORT} / ${API_ORIGIN} / ${WEBHOOK_API_KEY} are substituted by the official nginx
+    # image's built-in envsubst-on-templates entrypoint (files under
+    # /etc/nginx/templates/*.template). It only replaces names that are actually set as
+    # environment variables, so nginx's own runtime vars ($host, $uri, ...) below are left
+    # untouched.
     listen ${PORT};
 
     location /api/ {
         proxy_pass ${API_ORIGIN};
         proxy_set_header Host $host;
+        # The dashboard never learns the key — nginx injects it server-side on every
+        # proxied request, keeping it out of the JS bundle and swappable per environment
+        # (same reasoning as API_ORIGIN above) instead of baked in at `npm run build`.
+        proxy_set_header X-Api-Key ${WEBHOOK_API_KEY};
     }
 
     location /webhooks/ {

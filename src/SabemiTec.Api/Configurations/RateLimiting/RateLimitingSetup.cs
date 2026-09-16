@@ -9,10 +9,12 @@ namespace SabemiTec.Api.Configurations.RateLimiting;
 public static class RateLimitingSetup
 {
     public const string WebhookPolicy = "webhook";
+    public const string DashboardPolicy = "dashboard";
 
-    public static IServiceCollection AddWebhookRateLimiting(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddRateLimiting(this IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<RateLimitOptions>(configuration.GetSection(RateLimitOptions.SectionName));
+        services.Configure<DashboardRateLimitOptions>(configuration.GetSection(DashboardRateLimitOptions.SectionName));
 
         services.AddRateLimiter(rl =>
         {
@@ -25,13 +27,32 @@ public static class RateLimitingSetup
                 var options = httpContext.RequestServices.GetRequiredService<IOptions<RateLimitOptions>>().Value;
 
                 return RateLimitPartition.GetTokenBucketLimiter(
-                    PartitionKey(httpContext),
+                    ApiKeyOrIpPartitionKey(httpContext),
                     _ => new TokenBucketRateLimiterOptions
                     {
                         TokenLimit = options.TokenLimit,
                         TokensPerPeriod = options.TokensPerPeriod,
                         ReplenishmentPeriod = TimeSpan.FromSeconds(options.ReplenishmentPeriodSeconds),
                         AutoReplenishment = true,
+                        QueueLimit = options.QueueLimit,
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+                    });
+            });
+
+            // Fixed window, partitioned by IP only — every dashboard client shares the same
+            // ApiKey (the reverse proxy injects it, see ApiKeyAuthMiddleware), so partitioning
+            // by key here would lump every browser into one global bucket instead of one per
+            // client.
+            rl.AddPolicy(DashboardPolicy, httpContext =>
+            {
+                var options = httpContext.RequestServices.GetRequiredService<IOptions<DashboardRateLimitOptions>>().Value;
+
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    $"ip:{httpContext.Connection.RemoteIpAddress}",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = options.PermitLimit,
+                        Window = TimeSpan.FromSeconds(options.WindowSeconds),
                         QueueLimit = options.QueueLimit,
                         QueueProcessingOrder = QueueProcessingOrder.OldestFirst
                     });
@@ -60,7 +81,7 @@ public static class RateLimitingSetup
     // can't drain the legitimate partner's bucket. Never partition by transaction/contract
     // id: the middleware runs before the payload is even parsed, and unbounded cardinality
     // would leak memory disguised as a feature.
-    private static string PartitionKey(HttpContext httpContext)
+    private static string ApiKeyOrIpPartitionKey(HttpContext httpContext)
     {
         var apiKey = httpContext.Request.Headers["X-Api-Key"].ToString();
 

@@ -16,7 +16,7 @@ builder.Services
     .AddWebhookFeature()
     .AddProcessingFeature(builder.Configuration)
     .AddDashboardFeature()
-    .AddWebhookRateLimiting(builder.Configuration);
+    .AddRateLimiting(builder.Configuration);
 
 var app = builder.Build();
 

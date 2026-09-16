@@ -170,14 +170,28 @@ um resultado tipado ou a lista de erros de validação — nunca lança exceçã
 inválido precisa ser persistido, não descartado. Trocar de banco parceiro, ou suportar um
 segundo, é uma pasta nova implementando `IPaymentWebhookAcl`, sem tocar worker nem dashboard.
 
-### Rate limiting: token bucket, só no `/webhooks`
+### Rate limiting: token bucket no `/webhooks`, fixed window no dashboard
 
 Notificação bancária chega em rajada (o parceiro fecha um lote e dispara tudo de uma vez),
 não em fluxo constante — por isso token bucket, e não fixed/sliding window, que penalizariam
 a rajada legítima. `QueueLimit = 0` é deliberado: enfileirar significa segurar a requisição do
 banco esperando token, contradizendo o requisito de responder rápido — melhor 429 imediato do
-que segurar por segundos. A política existe só no grupo `/webhooks`; o dashboard não tem rate
-limit porque o polling de um browser não é o tráfego que precisa de proteção aqui.
+que segurar por segundos.
+
+`GET /api/payments` usa uma política separada (`DashboardPolicy`, fixed window, 120
+req/min por IP): o padrão de tráfego é outro — polling humano de uma aba de browser, não
+rajada de parceiro — e partitionar por ApiKey não faria sentido aqui, já que todo cliente do
+dashboard compartilha a mesma chave (ver seção de autenticação abaixo).
+
+### O dashboard também exige ApiKey — via proxy, não no bundle JS
+
+`GET /api/payments` é dado de pagamento; publicado sem auth, qualquer um na internet lê
+tudo. A `ApiKeyAuthMiddleware` (a mesma do webhook) passou a proteger os dois grupos de
+rota. A diferença é *onde* a chave é conhecida: o browser nunca a vê. O nginx do serviço
+`web` injeta o header `X-Api-Key` em toda requisição proxied para `/api/` (variável
+`WEBHOOK_API_KEY`, substituída em runtime pelo mesmo mecanismo de `envsubst` que já resolve
+`API_ORIGIN` — não é bakeada em `npm run build`, senão trocar a chave exigiria rebuildar a
+imagem). Fora do Docker, `vite.config.ts` faz o mesmo na configuração do proxy de dev.
 
 O ponto que mais importa: **o 429 acontece antes de qualquer persistência**, então o reenvio
 que ele provoca cai no mesmo caminho idempotente de sempre — nunca há "throttle por
@@ -232,7 +246,7 @@ clicável e aplica o filtro correspondente.
 | Observabilidade avançada (Serilog, health checks elaborados) | `/health` simples já cobre o que o compose precisa; o resto é peso sem uso num teste técnico |
 | HMAC/`X-Signature` | O enunciado pede "validação simples" — ApiKey em tempo constante atende; a estrutura do filtro comporta a evolução |
 | Rate limit distribuído (Redis) | O limiter nativo é em memória, por instância — correto para uma única réplica, documentado como limitação |
-| Autenticação de usuário no dashboard | Reutiliza a mesma ApiKey; em produção seria OIDC + BFF, já que uma chave em bundle JS não é secreta |
+| Autenticação de usuário no dashboard | Protege com a mesma ApiKey (via proxy nginx, não no bundle JS — ver seção de rate limiting/auth); em produção seria OIDC + BFF, um usuário humano por trás de uma ApiKey compartilhada não dá auditoria individual |
 | Worker como serviço .NET separado | Ganho de isolamento não justifica dois deploys/Dockerfiles para o volume deste teste |
 | Backoff exponencial com jitter | Retry fixo (3× / 30s) é suficiente sem múltiplos parceiros de alto volume |
 
@@ -323,13 +337,15 @@ quem builda é o GitHub Actions):
 
 **`sabemi-web`**
 - Imagem: `ghcr.io/<seu-usuario>/<repo>-web:latest`
-- Variável de ambiente:
+- Variáveis de ambiente:
   | Nome | Valor |
   |---|---|
   | `API_ORIGIN` | a URL pública do `sabemi-api` (ex.: `https://sabemi-api.onrender.com`) |
-- O nginx dentro da imagem usa essa variável para fazer proxy de `/api` e `/webhooks` até a
-  API — o mesmo mecanismo que evita CORS localmente (`web/nginx.conf.template`), só que
-  apontando para uma URL pública em vez do nome do serviço no docker-compose.
+  | `WEBHOOK_API_KEY` | a **mesma** chave configurada em `Webhook__ApiKey` no `sabemi-api` |
+- O nginx dentro da imagem usa `API_ORIGIN` para fazer proxy de `/api` e `/webhooks` até a
+  API — o mesmo mecanismo que evita CORS localmente (`web/nginx.conf.template`) — e injeta
+  `WEBHOOK_API_KEY` como header `X-Api-Key` em toda chamada a `/api`, autenticando o
+  dashboard sem expor a chave no bundle JS.
 
 Em ambos os serviços, pegue a **Deploy Hook URL** em *Settings → Deploy Hook* — é o que o
 GitHub Actions vai chamar a cada push.

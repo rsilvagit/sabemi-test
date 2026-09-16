@@ -4,6 +4,9 @@ using System.Text;
 namespace SabemiTec.Api.Middlewares;
 
 /// <summary>
+/// Guards both the webhook ingestion and the dashboard read API with the same key — the
+/// dashboard never gets its own credential, it reuses this one via a header the reverse
+/// proxy injects (see web/nginx.conf.template), not something the browser ever sees.
 /// Constant-time comparison over fixed-size hashes: eliminates the length leak that
 /// FixedTimeEquals over raw bytes would have. A failure never persists anything and never
 /// logs the received value. Same shape as core.flashcard-master's
@@ -26,7 +29,7 @@ public sealed class ApiKeyAuthMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
-        if (!IsWebhookPath(context.Request.Path))
+        if (!RequiresApiKey(context.Request.Path))
         {
             await _next(context);
             return;
@@ -45,7 +48,8 @@ public sealed class ApiKeyAuthMiddleware
         await _next(context);
     }
 
-    private static bool IsWebhookPath(PathString path) => path.StartsWithSegments("/webhooks/pagamento");
+    private static bool RequiresApiKey(PathString path) =>
+        path.StartsWithSegments("/webhooks/pagamento") || path.StartsWithSegments("/api/payments");
 
     private static bool IsValid(string provided, string expected)
     {
