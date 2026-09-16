@@ -1,8 +1,9 @@
 export type EffectiveStatus = 'Success' | 'Error' | 'Pending'
 
-// Only meaningful when effectiveStatus is 'Error' — distinguishes a malformed/incomplete
-// payload (never reached the bank's business outcome) from one the bank fully processed and
-// reported as failed. Null for Success/Pending.
+// Only meaningful when effectiveStatus is 'Error'. 'Validation' never actually reaches this
+// list anymore — payloads that fail validation are excluded from /api/payments entirely
+// (no dependable transaction/contract reference) and only show up via /api/payments/invalid
+// — kept here so the type still matches what the API could theoretically return.
 export type ErrorCategory = 'Validation' | 'PaymentFailure' | null
 
 // Demo-only: mocked contract master data (Database/PostgreSQL/Migrations/Scripts/0002_*.sql),
@@ -50,4 +51,25 @@ export interface PaymentStats {
   success: number
   error: number
   pending: number
+}
+
+// A payload that failed validation — no dependable transaction/contract reference, so no
+// effectiveStatus/errorCategory/contract enrichment, just the raw fields plus why it was
+// rejected.
+export interface InvalidPaymentEvent {
+  id: number
+  transactionId: string
+  contractId: string | null
+  amount: number | null
+  paymentDate: string | null
+  validationError: string | null
+  receivedAt: string
+}
+
+export interface InvalidPaymentsResponse {
+  items: InvalidPaymentEvent[]
+  page: number
+  pageSize: number
+  hasMore: boolean
+  total: number
 }

@@ -46,6 +46,16 @@ public static class DashboardRouteHandler
             .Produces(StatusCodes.Status429TooManyRequests)
             .WithOpenApi();
 
+        // Payloads that failed validation, kept out of / (no dependable contract/transaction
+        // reference to show alongside a real payment) but still visible — the PDF requires a
+        // clear visual alert for them, just not mixed into the main payments list.
+        group.MapGet("/invalid", SearchInvalidAsync)
+            .WithName("SearchInvalidPayments")
+            .Produces(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status429TooManyRequests)
+            .WithOpenApi();
+
         return app;
     }
 
@@ -94,6 +104,34 @@ public static class DashboardRouteHandler
         var contractIds = await repository.ListContractIdsAsync(ct);
         return Results.Ok(contractIds);
     }
+
+    private static async Task<IResult> SearchInvalidAsync(
+        IPaymentQueryRepository repository,
+        IUnitOfWork uow,
+        CancellationToken ct,
+        int page = 1,
+        int pageSize = 25)
+    {
+        uow.Open();
+
+        page = page <= 0 ? 1 : page;
+        pageSize = pageSize <= 0 ? 25 : pageSize;
+
+        var (items, hasMore) = await repository.SearchInvalidAsync(page, pageSize, ct);
+        var total = await repository.CountInvalidAsync(ct);
+
+        return Results.Ok(new SearchInvalidPaymentsResponse(
+            items.Select(ToInvalidDto).ToList(), page, pageSize, hasMore, total));
+    }
+
+    private static InvalidPaymentEventDto ToInvalidDto(InvalidPaymentEvent item) => new(
+        item.Id,
+        item.TransactionId,
+        item.ContractId,
+        item.Amount,
+        item.PaymentDate,
+        item.ValidationError,
+        item.ReceivedAt);
 
     private static PaymentListItemDto ToDto(PaymentListItem item) => new(
         item.Id,

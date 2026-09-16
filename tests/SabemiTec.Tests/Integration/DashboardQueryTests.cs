@@ -28,7 +28,7 @@ public class DashboardQueryTests(DatabaseFixture db) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task InvalidPayload_ShowsUpAsError_AndCarriesTheValidationMessage()
+    public async Task InvalidPayload_ExcludedFromMainList_ButVisibleInInvalidEndpoint()
     {
         await _client.PostAsJsonAsync("/webhooks/payment", new
         {
@@ -39,15 +39,20 @@ public class DashboardQueryTests(DatabaseFixture db) : IAsyncLifetime
             status = "PAGO"
         });
 
-        var response = await _client.GetAsync("/api/payments?status=Error");
-        response.EnsureSuccessStatusCode();
+        // No dependable transaction/contract reference on a malformed payload — excluded
+        // from the main list entirely, not shown as an "Error" row next to real payments.
+        var mainList = await _client.GetAsync("/api/payments?status=Error");
+        mainList.EnsureSuccessStatusCode();
+        var mainBody = await mainList.Content.ReadFromJsonAsync<JsonElementWrapper>(JsonOptions);
+        mainBody!.Items.Should().NotContain(i => i.TransactionId == "TX-DASH-001");
 
-        var body = await response.Content.ReadFromJsonAsync<JsonElementWrapper>(JsonOptions);
-        var items = body!.Items;
+        // Still visible — just in its own endpoint, not implying a trustworthy contract link.
+        var invalidList = await _client.GetAsync("/api/payments/invalid");
+        invalidList.EnsureSuccessStatusCode();
+        var invalidBody = await invalidList.Content.ReadFromJsonAsync<InvalidListResponse>(JsonOptions);
 
-        items.Should().ContainSingle(i => i.TransactionId == "TX-DASH-001");
-        var item = items.Single(i => i.TransactionId == "TX-DASH-001");
-        item.EffectiveStatus.Should().Be("Error");
+        invalidBody!.Items.Should().ContainSingle(i => i.TransactionId == "TX-DASH-001");
+        var item = invalidBody.Items.Single(i => i.TransactionId == "TX-DASH-001");
         item.ValidationError.Should().Contain("valor");
     }
 
@@ -148,8 +153,14 @@ public class DashboardQueryTests(DatabaseFixture db) : IAsyncLifetime
 
         var stats = await response.Content.ReadFromJsonAsync<StatsResponse>(JsonOptions);
 
-        stats!.Total.Should().Be(2);
-        stats.Error.Should().BeGreaterThanOrEqualTo(1);
+        // The invalid payload (valor < 0) doesn't count toward the main stats anymore — it's
+        // excluded from the list those cards summarize, same as /api/payments. Total (not
+        // Success) is what's timing-independent here — the valid one may still be Pending.
+        stats!.Total.Should().Be(1);
+
+        var invalidResponse = await _client.GetAsync("/api/payments/invalid");
+        var invalid = await invalidResponse.Content.ReadFromJsonAsync<InvalidListResponse>(JsonOptions);
+        invalid!.Total.Should().Be(1);
     }
 
     private sealed record CreatedResponse(long Id);
@@ -157,4 +168,6 @@ public class DashboardQueryTests(DatabaseFixture db) : IAsyncLifetime
     private sealed record PaymentItemResponse(string TransactionId, string? ContractId, string EffectiveStatus, string? ValidationError);
     private sealed record JsonElementWrapper(List<PaymentItemResponse> Items, bool HasMore);
     private sealed record StatsResponse(long Total, long Success, long Error, long Pending);
+    private sealed record InvalidItemResponse(string TransactionId, string? ContractId, string? ValidationError);
+    private sealed record InvalidListResponse(List<InvalidItemResponse> Items, bool HasMore, long Total);
 }

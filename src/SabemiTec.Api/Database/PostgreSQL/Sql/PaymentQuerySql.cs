@@ -51,6 +51,12 @@ internal static class PaymentQuerySql
     // `contract_id` is ambiguous between the two tables (qualified below); the columns the
     // CASE expressions read (is_valid, processing_status, payment_status) exist only on
     // payment_event, so they need no qualification.
+    //
+    // `where e.is_valid` excludes malformed payloads from the main list entirely: a payload
+    // that failed validation has no dependable id_transacao/id_contrato (both can be missing
+    // or garbage), so it can't be shown next to a contract or trusted the way a real payment
+    // row is. They're not deleted — still visible via SelectInvalid/CountInvalid below, kept
+    // separate instead of mixed into a list that implies "this refers to a real contract".
     public static readonly string SelectBase = $"""
         select * from (
             select
@@ -62,19 +68,35 @@ internal static class PaymentQuerySql
                 {InstallmentNumberWindow} as installment_number
             from payment_event e
             left join contract c on c.contract_id = e.contract_id
+            where e.is_valid
         ) events
         """;
 
     // Reuses the same case expression per bucket — one table scan, four conditional
-    // aggregates. Cheap enough to run on every dashboard poll.
+    // aggregates. Cheap enough to run on every dashboard poll. Same is_valid exclusion as
+    // SelectBase, so the stat cards match what the main list actually shows.
     public static readonly string Stats = $"""
         select
             count(*) as total,
             count(*) filter (where {EffectiveStatusCase} = 'Success') as success,
             count(*) filter (where {EffectiveStatusCase} = 'Error') as error,
             count(*) filter (where {EffectiveStatusCase} = 'Pending') as pending
-        from payment_event;
+        from payment_event
+        where is_valid;
         """;
+
+    // Invalid payloads: no contract join (the contract_id on these rows isn't trustworthy),
+    // no effective_status/error_category (both only make sense for something that could
+    // reach a business outcome). Just the raw fields plus why validation rejected it.
+    public static readonly string SelectInvalid = """
+        select id, transaction_id, contract_id, amount, payment_date, validation_error, received_at
+        from payment_event
+        where not is_valid
+        order by received_at desc, id desc
+        limit @Limit offset @Offset;
+        """;
+
+    public static readonly string CountInvalid = "select count(*) from payment_event where not is_valid;";
 
     // installment_number is a window function over contract_id — it has to see every event
     // for that contract, not just the one row `id = @Id` would filter down to. WHERE runs

@@ -74,4 +74,28 @@ internal sealed class PaymentQueryRepository(IDatabaseConnection db) : IPaymentQ
         var cmd = new CommandDefinition(PaymentQuerySql.ListContractIds, cancellationToken: ct);
         return (await db.Connection.QueryAsync<string>(cmd)).AsList();
     }
+
+    public async Task<(IReadOnlyList<InvalidPaymentEvent> Items, bool HasMore)> SearchInvalidAsync(int page, int pageSize, CancellationToken ct)
+    {
+        page = Math.Max(page, 1);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+
+        var parameters = new { Limit = pageSize + 1, Offset = (page - 1) * pageSize };
+        var cmd = new CommandDefinition(PaymentQuerySql.SelectInvalid, parameters, cancellationToken: ct);
+        var rows = (await db.Connection.QueryAsync<InvalidPaymentEvent>(cmd)).AsList();
+
+        var hasMore = rows.Count > pageSize;
+        if (hasMore)
+        {
+            rows.RemoveAt(rows.Count - 1);
+        }
+
+        return (rows, hasMore);
+    }
+
+    public async Task<long> CountInvalidAsync(CancellationToken ct)
+    {
+        var cmd = new CommandDefinition(PaymentQuerySql.CountInvalid, cancellationToken: ct);
+        return await db.Connection.QuerySingleAsync<long>(cmd);
+    }
 }
