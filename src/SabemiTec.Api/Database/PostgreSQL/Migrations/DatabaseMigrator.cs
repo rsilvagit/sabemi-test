@@ -38,7 +38,7 @@ public static class DatabaseMigrator
                 throw new InvalidOperationException("Failed to apply migrations.", result.Error);
             }
 
-            logger.LogInformation("Migrations applied: {Count} script(s) executed.", result.Scripts.Count());
+            logger.LogInformation("[DatabaseMigrator] Migrations applied: {Count} script(s) executed.", result.Scripts.Count());
         }
         finally
         {
@@ -64,7 +64,7 @@ public static class DatabaseMigrator
             catch (Exception ex)
             {
                 lastError = ex;
-                logger.LogWarning("Postgres is not ready yet, retrying in 1s...");
+                logger.LogWarning("[DatabaseMigrator] Postgres is not ready yet, retrying in 1s...");
                 await Task.Delay(TimeSpan.FromSeconds(1), ct);
             }
         }

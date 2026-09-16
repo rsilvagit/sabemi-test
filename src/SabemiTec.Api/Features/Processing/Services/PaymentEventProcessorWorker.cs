@@ -18,7 +18,7 @@ public sealed class PaymentEventProcessorWorker(
     {
         if (!options.Value.WorkerEnabled)
         {
-            logger.LogInformation("Worker disabled (Processing:WorkerEnabled=false).");
+            logger.LogInformation("[PaymentEventProcessorWorker] Worker disabled (Processing:WorkerEnabled=false).");
             return;
         }
 
@@ -51,7 +51,7 @@ public sealed class PaymentEventProcessorWorker(
             {
                 // An unhandled exception here would kill the BackgroundService silently —
                 // the app would stay up looking healthy while nothing gets processed.
-                logger.LogError(ex, "Error in the processing worker loop.");
+                logger.LogError(ex, "[PaymentEventProcessorWorker] Error in the processing worker loop.");
                 await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
             }
         }
