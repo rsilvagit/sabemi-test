@@ -1,7 +1,8 @@
 using SabemiTec.Api.Configurations.Extensions;
+using SabemiTec.Api.Configurations.RateLimiting;
 using SabemiTec.Api.Database.PostgreSQL;
 using SabemiTec.Api.Database.PostgreSQL.Migrations;
-using SabemiTec.Api.Configurations.RateLimiting;
+using SabemiTec.Api.Middlewares;
 
 DapperConfig.Configure();
 
@@ -32,6 +33,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+app.UseApiKeyAuth();
 
 app.UseRateLimiter();
 

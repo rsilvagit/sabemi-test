@@ -7,7 +7,6 @@ using SabemiTec.Api.Features.Processing.Repositories;
 using SabemiTec.Api.Features.Processing.Services;
 using SabemiTec.Api.Features.Webhooks.Repositories;
 using SabemiTec.Api.Features.Webhooks.Services;
-using SabemiTec.Api.Security;
 
 namespace SabemiTec.Api.Configurations.Extensions;
 
@@ -41,7 +40,6 @@ public static class ServicesExtensions
     {
         services.AddScoped<IPaymentEventRepository, PaymentEventRepository>();
         services.AddScoped<IngestPaymentHandler>();
-        services.AddTransient<ApiKeyEndpointFilter>();
 
         return services;
     }

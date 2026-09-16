@@ -1,6 +1,5 @@
 using System.Text.Json;
 using SabemiTec.Api.Features.Webhooks.Services;
-using SabemiTec.Api.Security;
 using SabemiTec.Api.Configurations.RateLimiting;
 
 namespace SabemiTec.Api.Features.Webhooks.RouteHandler;
@@ -11,7 +10,6 @@ public static class PaymentWebhookRouteHandler
     {
         var group = app.MapGroup("/webhooks")
             .RequireRateLimiting(RateLimitingSetup.WebhookPolicy)
-            .AddEndpointFilter<ApiKeyEndpointFilter>()
             .WithTags("Webhooks");
 
         group.MapPost("/pagamento", PostPaymentAsync)
