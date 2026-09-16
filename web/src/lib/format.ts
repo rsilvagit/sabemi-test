@@ -10,3 +10,14 @@ export function formatDate(value: string | null): string {
   if (!value) return '—'
   return dateFormatter.format(new Date(value))
 }
+
+const CONTRACT_TYPE_LABELS: Record<string, string> = {
+  Emprestimo: 'Empréstimo',
+  Seguro: 'Seguro',
+}
+
+export function formatContractType(contractType: string | null, installments: number | null): string {
+  if (!contractType) return '—'
+  const label = CONTRACT_TYPE_LABELS[contractType] ?? contractType
+  return installments ? `${label} (${installments}x)` : label
+}

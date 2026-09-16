@@ -5,6 +5,10 @@ export type EffectiveStatus = 'Success' | 'Error' | 'Pending'
 // reported as failed. Null for Success/Pending.
 export type ErrorCategory = 'Validation' | 'PaymentFailure' | null
 
+// Demo-only: mocked contract master data (Database/PostgreSQL/Migrations/Scripts/0002_*.sql),
+// not something the webhook payload ever sends. Null when the contract has no seeded entry.
+export type ContractType = 'Emprestimo' | 'Seguro' | null
+
 export interface PaymentListItem {
   id: number
   transactionId: string
@@ -15,6 +19,8 @@ export interface PaymentListItem {
   processingStatus: number
   effectiveStatus: EffectiveStatus
   errorCategory: ErrorCategory
+  contractType: ContractType
+  installments: number | null
   attempts: number
   lastError: string | null
   validationError: string | null

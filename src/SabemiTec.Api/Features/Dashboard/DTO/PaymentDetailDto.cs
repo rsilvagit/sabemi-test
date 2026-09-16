@@ -10,6 +10,8 @@ public sealed record PaymentDetailDto(
     short ProcessingStatus,
     string EffectiveStatus,
     string? ErrorCategory,
+    string? ContractType,
+    int? Installments,
     int Attempts,
     string? LastError,
     string? ValidationError,

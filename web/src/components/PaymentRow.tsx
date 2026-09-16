@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { StatusBadge } from './StatusBadge'
 import { ErrorDetails } from './ErrorDetails'
-import { formatCurrency, formatDate } from '../lib/format'
+import { formatContractType, formatCurrency, formatDate } from '../lib/format'
 import type { PaymentListItem } from '../api/types'
 
 export function PaymentRow({ item }: { item: PaymentListItem }) {
@@ -20,6 +20,9 @@ export function PaymentRow({ item }: { item: PaymentListItem }) {
           {item.transactionId.startsWith('MISSING:') ? 'Não informada' : item.transactionId}
         </td>
         <td className="px-4 py-3 text-primary-700">{item.contractId ?? '—'}</td>
+        <td className="px-4 py-3 text-gray-600">
+          {formatContractType(item.contractType, item.installments)}
+        </td>
         <td className="px-4 py-3">{formatCurrency(item.amount)}</td>
         <td className="px-4 py-3">
           <StatusBadge status={item.effectiveStatus} errorCategory={item.errorCategory} />
@@ -29,7 +32,7 @@ export function PaymentRow({ item }: { item: PaymentListItem }) {
       </tr>
       {expanded && isError && (
         <tr>
-          <td colSpan={6} className="p-0">
+          <td colSpan={7} className="p-0">
             <ErrorDetails item={item} />
           </td>
         </tr>

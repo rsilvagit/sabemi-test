@@ -13,6 +13,8 @@ public class PaymentListItem
     public short ProcessingStatus { get; init; }
     public string EffectiveStatus { get; init; } = default!;
     public string? ErrorCategory { get; init; }
+    public string? ContractType { get; init; }
+    public int? Installments { get; init; }
     public int Attempts { get; init; }
     public string? LastError { get; init; }
     public string? ValidationError { get; init; }
