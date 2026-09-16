@@ -47,7 +47,7 @@ public class WebhookIdempotencyTests(DatabaseFixture db) : IAsyncLifetime
             client.DefaultRequestHeaders.Add("X-Api-Key", SabemiWebApplicationFactory.TestApiKey);
             var content = new StringContent(
                 System.Text.Json.JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-            return await client.PostAsync("/webhooks/pagamento", content);
+            return await client.PostAsync("/webhooks/payment", content);
         });
 
         var responses = await Task.WhenAll(tasks);

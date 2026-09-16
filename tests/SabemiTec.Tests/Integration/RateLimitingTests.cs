@@ -26,7 +26,7 @@ public class RateLimitingTests(DatabaseFixture db) : IAsyncLifetime
         for (var i = 0; i < 10; i++)
         {
             var transactionId = $"TX-RATE-{i}";
-            var response = await client.PostAsJsonAsync("/webhooks/pagamento", new
+            var response = await client.PostAsJsonAsync("/webhooks/payment", new
             {
                 id_transacao = transactionId,
                 id_contrato = "CT-RATE",
@@ -54,7 +54,7 @@ public class RateLimitingTests(DatabaseFixture db) : IAsyncLifetime
         HttpResponseMessage? retryResponse = null;
         for (var attempt = 0; attempt < 20; attempt++)
         {
-            retryResponse = await client.PostAsJsonAsync("/webhooks/pagamento", retryPayload);
+            retryResponse = await client.PostAsJsonAsync("/webhooks/payment", retryPayload);
             if (retryResponse.StatusCode != HttpStatusCode.TooManyRequests)
             {
                 break;

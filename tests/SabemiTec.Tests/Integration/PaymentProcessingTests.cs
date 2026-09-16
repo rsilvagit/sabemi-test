@@ -34,7 +34,7 @@ public class PaymentProcessingTests(DatabaseFixture db) : IAsyncLifetime
             status = "PAGO"
         };
 
-        var response = await client.PostAsJsonAsync("/webhooks/pagamento", payload);
+        var response = await client.PostAsJsonAsync("/webhooks/payment", payload);
         response.EnsureSuccessStatusCode();
 
         var processingStatus = await PollProcessingStatusAsync("TX-WORKER-001", TimeSpan.FromSeconds(10));
@@ -57,7 +57,7 @@ public class PaymentProcessingTests(DatabaseFixture db) : IAsyncLifetime
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add("X-Api-Key", SabemiWebApplicationFactory.TestApiKey);
 
-        await client.PostAsJsonAsync("/webhooks/pagamento", new
+        await client.PostAsJsonAsync("/webhooks/payment", new
         {
             id_transacao = "TX-MULTI-001",
             id_contrato = "CT-MULTI-01",
@@ -65,7 +65,7 @@ public class PaymentProcessingTests(DatabaseFixture db) : IAsyncLifetime
             data_pagamento = "2026-09-10T10:00:00Z",
             status = "PAGO"
         });
-        await client.PostAsJsonAsync("/webhooks/pagamento", new
+        await client.PostAsJsonAsync("/webhooks/payment", new
         {
             id_transacao = "TX-MULTI-002",
             id_contrato = "CT-MULTI-01",
@@ -73,7 +73,7 @@ public class PaymentProcessingTests(DatabaseFixture db) : IAsyncLifetime
             data_pagamento = "2026-09-12T10:00:00Z",
             status = "FALHA"
         });
-        await client.PostAsJsonAsync("/webhooks/pagamento", new
+        await client.PostAsJsonAsync("/webhooks/payment", new
         {
             id_transacao = "TX-MULTI-003",
             id_contrato = "CT-MULTI-01",

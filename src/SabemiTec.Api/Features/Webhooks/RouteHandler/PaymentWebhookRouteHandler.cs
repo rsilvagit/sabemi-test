@@ -13,7 +13,7 @@ public static class PaymentWebhookRouteHandler
             .RequireRateLimiting(RateLimitingSetup.WebhookPolicy)
             .WithTags("Webhooks");
 
-        group.MapPost("/pagamento", PostPaymentAsync)
+        group.MapPost("/payment", PostPaymentAsync)
             .WithName("PostPayment")
             .Produces(StatusCodes.Status202Accepted)
             .Produces(StatusCodes.Status200OK)

@@ -2,7 +2,7 @@
 @apikey = dev-local-key
 
 ### 1. Valid payment -> 202 Accepted
-POST {{host}}/webhooks/pagamento
+POST {{host}}/webhooks/payment
 Content-Type: application/json
 X-Api-Key: {{apikey}}
 
@@ -15,7 +15,7 @@ X-Api-Key: {{apikey}}
 }
 
 ### 2. Same id_transacao again -> 200 OK, duplicate: true
-POST {{host}}/webhooks/pagamento
+POST {{host}}/webhooks/payment
 Content-Type: application/json
 X-Api-Key: {{apikey}}
 
@@ -28,7 +28,7 @@ X-Api-Key: {{apikey}}
 }
 
 ### 3. Missing ApiKey -> 401
-POST {{host}}/webhooks/pagamento
+POST {{host}}/webhooks/payment
 Content-Type: application/json
 
 {
@@ -40,7 +40,7 @@ Content-Type: application/json
 }
 
 ### 4. Invalid ApiKey -> 401
-POST {{host}}/webhooks/pagamento
+POST {{host}}/webhooks/payment
 Content-Type: application/json
 X-Api-Key: wrong-key
 
@@ -53,7 +53,7 @@ X-Api-Key: wrong-key
 }
 
 ### 5. Invalid payload (negative amount) -> 400, but persisted as Rejected
-POST {{host}}/webhooks/pagamento
+POST {{host}}/webhooks/payment
 Content-Type: application/json
 X-Api-Key: {{apikey}}
 
@@ -66,7 +66,7 @@ X-Api-Key: {{apikey}}
 }
 
 ### 6. Second payment on the same contract -> check the sum in contract_status
-POST {{host}}/webhooks/pagamento
+POST {{host}}/webhooks/payment
 Content-Type: application/json
 X-Api-Key: {{apikey}}
 
@@ -79,14 +79,14 @@ X-Api-Key: {{apikey}}
 }
 
 ### 7. Malformed JSON -> 400, not persisted
-POST {{host}}/webhooks/pagamento
+POST {{host}}/webhooks/payment
 Content-Type: application/json
 X-Api-Key: {{apikey}}
 
 { this is not json }
 
 ### 8. Missing id_transacao -> 400, persisted with a synthetic key (MISSING:...)
-POST {{host}}/webhooks/pagamento
+POST {{host}}/webhooks/payment
 Content-Type: application/json
 X-Api-Key: {{apikey}}
 
@@ -101,7 +101,7 @@ X-Api-Key: {{apikey}}
 ### exceed the token bucket (default TokenLimit=200) -> 429 with a Retry-After header.
 ### Retrying the same id_transacao afterwards is still accepted exactly once — 429 never
 ### persists anything, so it never breaks idempotency.
-POST {{host}}/webhooks/pagamento
+POST {{host}}/webhooks/payment
 Content-Type: application/json
 X-Api-Key: {{apikey}}
 

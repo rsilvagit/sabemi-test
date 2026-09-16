@@ -2,7 +2,7 @@ using System.Text;
 using System.Text.Json;
 
 // Stands in for the partner bank: keeps POSTing synthetic payloads at
-// /webhooks/pagamento over real HTTP (same auth, same idempotency, same async
+// /webhooks/payment over real HTTP (same auth, same idempotency, same async
 // processing a genuine notification would go through), so the deployed demo shows
 // live movement instead of a static seed. Meant to run as its own long-lived
 // process/service, independent from the API and the dashboard.
@@ -54,7 +54,7 @@ static async Task SendOneAsync(HttpClient client, string[] contractIds, Random r
     var json = JsonSerializer.Serialize(payload);
 
     using var content = new StringContent(json, Encoding.UTF8, "application/json");
-    using var response = await client.PostAsync("/webhooks/pagamento", content, ct);
+    using var response = await client.PostAsync("/webhooks/payment", content, ct);
 
     Console.WriteLine(
         $"[{DateTime.UtcNow:O}] {payload.GetValueOrDefault("id_transacao") ?? "(sem id_transacao)"} -> HTTP {(int)response.StatusCode}");

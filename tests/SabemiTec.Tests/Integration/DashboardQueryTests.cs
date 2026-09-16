@@ -30,7 +30,7 @@ public class DashboardQueryTests(DatabaseFixture db) : IAsyncLifetime
     [Fact]
     public async Task InvalidPayload_ShowsUpAsError_AndCarriesTheValidationMessage()
     {
-        await _client.PostAsJsonAsync("/webhooks/pagamento", new
+        await _client.PostAsJsonAsync("/webhooks/payment", new
         {
             id_transacao = "TX-DASH-001",
             id_contrato = "CT-DASH-01",
@@ -54,7 +54,7 @@ public class DashboardQueryTests(DatabaseFixture db) : IAsyncLifetime
     [Fact]
     public async Task FilterByContractId_ReturnsOnlyMatchingContract()
     {
-        await _client.PostAsJsonAsync("/webhooks/pagamento", new
+        await _client.PostAsJsonAsync("/webhooks/payment", new
         {
             id_transacao = "TX-DASH-010",
             id_contrato = "CT-A",
@@ -62,7 +62,7 @@ public class DashboardQueryTests(DatabaseFixture db) : IAsyncLifetime
             data_pagamento = "2026-09-15T10:00:00Z",
             status = "PAGO"
         });
-        await _client.PostAsJsonAsync("/webhooks/pagamento", new
+        await _client.PostAsJsonAsync("/webhooks/payment", new
         {
             id_transacao = "TX-DASH-011",
             id_contrato = "CT-B",
@@ -82,7 +82,7 @@ public class DashboardQueryTests(DatabaseFixture db) : IAsyncLifetime
     {
         for (var i = 0; i < 3; i++)
         {
-            await _client.PostAsJsonAsync("/webhooks/pagamento", new
+            await _client.PostAsJsonAsync("/webhooks/payment", new
             {
                 id_transacao = $"TX-PAGE-{i}",
                 id_contrato = "CT-PAGE",
@@ -106,7 +106,7 @@ public class DashboardQueryTests(DatabaseFixture db) : IAsyncLifetime
     [Fact]
     public async Task GetById_ReturnsRawPayload()
     {
-        var post = await _client.PostAsJsonAsync("/webhooks/pagamento", new
+        var post = await _client.PostAsJsonAsync("/webhooks/payment", new
         {
             id_transacao = "TX-DASH-020",
             id_contrato = "CT-DASH-02",
@@ -126,7 +126,7 @@ public class DashboardQueryTests(DatabaseFixture db) : IAsyncLifetime
     [Fact]
     public async Task GetStats_CountsByEffectiveStatus()
     {
-        await _client.PostAsJsonAsync("/webhooks/pagamento", new
+        await _client.PostAsJsonAsync("/webhooks/payment", new
         {
             id_transacao = "TX-STATS-OK",
             id_contrato = "CT-STATS",
@@ -134,7 +134,7 @@ public class DashboardQueryTests(DatabaseFixture db) : IAsyncLifetime
             data_pagamento = "2026-09-15T10:00:00Z",
             status = "PAGO"
         });
-        await _client.PostAsJsonAsync("/webhooks/pagamento", new
+        await _client.PostAsJsonAsync("/webhooks/payment", new
         {
             id_transacao = "TX-STATS-BAD",
             id_contrato = "CT-STATS",

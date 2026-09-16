@@ -24,7 +24,7 @@ Para gerar dados de exemplo, use a collection `requests/webhooks.http` (abre dir
 VS Code/Rider) ou:
 
 ```bash
-curl -X POST http://localhost:8080/webhooks/pagamento \
+curl -X POST http://localhost:8080/webhooks/payment \
   -H "Content-Type: application/json" -H "X-Api-Key: dev-local-key" \
   -d '{"id_transacao":"TX-001","id_contrato":"CT-42","valor":150.50,"data_pagamento":"2026-09-15T10:00:00Z","status":"PAGO"}'
 ```
@@ -45,7 +45,7 @@ depois — é o processamento assíncrono em ação.
 ## Arquitetura
 
 ```
-                         POST /webhooks/pagamento
+                         POST /webhooks/payment
                                     │
                     rate limit → ApiKey → ACL (traduz payload do banco)
                                     │
@@ -154,7 +154,7 @@ O `IUnitOfWork` é usado **apenas** onde existe uma transação real:
 | Caminho | Usa transação? | Por quê |
 |---|---|---|
 | Worker: upsert do contrato + marcar `Processed` | **Sim** | Duas escritas que precisam ser atômicas — a única transação real do sistema |
-| `POST /webhooks/pagamento` | Não | Um único INSERT; abrir transação seria cerimônia |
+| `POST /webhooks/payment` | Não | Um único INSERT; abrir transação seria cerimônia |
 | Claim do worker | Não | `UPDATE ... RETURNING` já é atômico em autocommit |
 | Leitura do dashboard | Não | Transação para um `SELECT` é ruído |
 
@@ -384,7 +384,7 @@ vivo na demo; não é parte do requisito)
   | `API_URL` | a URL pública do `sabemi-api` (ex.: `https://sabemi-api.onrender.com`) |
   | `WEBHOOK_API_KEY` | a mesma chave real do `Webhook__ApiKey` do `sabemi-api` |
   | `INTERVAL_SECONDS` | `5` (opcional, é o default) |
-- Faz exatamente o que um banco parceiro real faria: chama `POST /webhooks/pagamento` no
+- Faz exatamente o que um banco parceiro real faria: chama `POST /webhooks/payment` no
   `sabemi-api` periodicamente, com uma mistura de payloads válidos (pago/falha) e inválidos
   (sem `id_transacao`, valor negativo, status desconhecido), pra exercitar todos os estados
   do dashboard.
@@ -421,14 +421,14 @@ src/SabemiTec.Api/
 ├── ACL/PartnerBank/        # fronteira com o payload do banco parceiro
 ├── Enum/                   # enums-como-classe (Enumeration + derivados)
 ├── Features/
-│   ├── Webhooks/           # POST /webhooks/pagamento — ingestão + idempotência
+│   ├── Webhooks/           # POST /webhooks/payment — ingestão + idempotência
 │   ├── Processing/         # worker: claim, delay, upsert, retry/dead-letter
 │   └── Dashboard/          # GET /api/payments — leitura, filtros, stats
 ├── Database/PostgreSQL/    # IUnitOfWork, Dapper, SQL, migrations (DbUp)
 ├── Middlewares/            # ApiKeyAuthMiddleware
 └── Configurations/         # DI, RateLimiting, mapeamento de rotas
 
-src/SabemiTec.LoadSimulator/  # worker standalone: gera carga sintética em POST /webhooks/pagamento
+src/SabemiTec.LoadSimulator/  # worker standalone: gera carga sintética em POST /webhooks/payment
 
 web/src/
 ├── api/                    # client, chamadas, tipos

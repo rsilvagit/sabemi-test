@@ -17,7 +17,7 @@ public enum IngestOutcome
 public sealed record IngestPaymentResult(IngestOutcome Outcome, long? EventId, string TransactionId, IReadOnlyList<ValidationFailure> Errors);
 
 /// <summary>
-/// Flow of POST /webhooks/pagamento: translate via the ACL, do a single idempotent INSERT,
+/// Flow of POST /webhooks/payment: translate via the ACL, do a single idempotent INSERT,
 /// and return the outcome. No transaction here on purpose — a single write doesn't need one
 /// (see plan section 6.5) — but the connection still needs to be opened first.
 /// </summary>

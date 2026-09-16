@@ -49,7 +49,7 @@ public sealed class ApiKeyAuthMiddleware
     }
 
     private static bool RequiresApiKey(PathString path) =>
-        path.StartsWithSegments("/webhooks/pagamento") || path.StartsWithSegments("/api/payments");
+        path.StartsWithSegments("/webhooks/payment") || path.StartsWithSegments("/api/payments");
 
     private static bool IsValid(string provided, string expected)
     {
