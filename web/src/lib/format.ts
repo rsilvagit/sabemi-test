@@ -16,12 +16,12 @@ const CONTRACT_TYPE_LABELS: Record<string, string> = {
   Seguro: 'Seguro',
 }
 
-export function formatContractType(
-  contractType: string | null,
-  installments: number | null,
-  installmentNumber: number | null,
-): string {
+export function formatContractType(contractType: string | null): string {
   if (!contractType) return '—'
-  const label = CONTRACT_TYPE_LABELS[contractType] ?? contractType
-  return installments ? `${label} (${installmentNumber ?? '?'}/${installments})` : label
+  return CONTRACT_TYPE_LABELS[contractType] ?? contractType
+}
+
+export function formatInstallment(installments: number | null, installmentNumber: number | null): string {
+  if (!installments) return '—'
+  return `${installmentNumber ?? '?'}/${installments}`
 }

@@ -1,4 +1,4 @@
-import { formatContractType, formatCurrency, formatDate } from '../lib/format'
+import { formatContractType, formatCurrency, formatDate, formatInstallment } from '../lib/format'
 import type { EffectiveStatus, PaymentListItem } from '../api/types'
 
 // Shows the fields the API already parsed out of the payload, not the raw JSON — an
@@ -47,9 +47,10 @@ export function PaymentDetails({ item }: { item: PaymentListItem }) {
             value={item.transactionId.startsWith('MISSING:') ? 'Não informada' : item.transactionId}
           />
           <Field label="Contrato" value={item.contractId ?? 'Não informado'} />
+          <Field label="Tipo de Contrato" value={formatContractType(item.contractType)} />
           <Field
-            label="Tipo de Contrato"
-            value={formatContractType(item.contractType, item.installments, item.installmentNumber)}
+            label="Parcela"
+            value={formatInstallment(item.installments, item.installmentNumber)}
           />
           <Field label="Valor" value={formatCurrency(item.amount)} />
           <Field label="Valor total do contrato" value={formatCurrency(item.totalValue)} />
