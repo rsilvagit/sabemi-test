@@ -33,8 +33,16 @@ internal static class PaymentQuerySql
     // Which installment this event is, within its own contract: position in the chronological
     // sequence of events received for that contract_id — demo-only, same spirit as
     // contract_type/installments (no payload field carries an installment number either).
-    private const string InstallmentNumberWindow =
-        "row_number() over (partition by e.contract_id order by e.received_at)";
+    // Wrapped modulo c.installments: the load simulator keeps generating events for the same
+    // 8 seeded contracts indefinitely, so a plain row_number() grows past the contract's real
+    // installment count (e.g. "262/24") the moment demo traffic runs long enough — cycling
+    // back to 1 after the total keeps the label sane instead of ever-climbing nonsense.
+    private const string InstallmentNumberWindow = """
+        case
+            when c.installments is null or c.installments = 0 then null
+            else ((row_number() over (partition by e.contract_id order by e.received_at) - 1) % c.installments) + 1
+        end
+        """;
 
     // Wrapped as a subquery so `effective_status` becomes a real column the outer WHERE can
     // filter on — Postgres does not let WHERE see a SELECT-list alias (WHERE runs before SELECT).
