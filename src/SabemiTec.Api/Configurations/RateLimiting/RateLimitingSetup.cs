@@ -4,7 +4,7 @@ using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 
-namespace SabemiTec.Api.Security.RateLimiting;
+namespace SabemiTec.Api.Configurations.RateLimiting;
 
 public static class RateLimitingSetup
 {
@@ -17,9 +17,9 @@ public static class RateLimitingSetup
         services.AddRateLimiter(rl =>
         {
             // Options resolved lazily from HttpContext.RequestServices, at request time —
-            // not captured eagerly here. Same class of bug as the NpgsqlDataSource one:
-            // capturing config at registration time means WebApplicationFactory's test
-            // overrides never get seen (they land during Build(), which runs after this).
+            // not captured eagerly here. Same class of bug as a singleton capturing
+            // IConfiguration at registration time: WebApplicationFactory's test overrides
+            // never get seen (they land during Build(), which runs after this).
             rl.AddPolicy(WebhookPolicy, httpContext =>
             {
                 var options = httpContext.RequestServices.GetRequiredService<IOptions<RateLimitOptions>>().Value;

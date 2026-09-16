@@ -1,7 +1,7 @@
 using System.Text.Json;
 using SabemiTec.Api.Features.Webhooks.Services;
 using SabemiTec.Api.Security;
-using SabemiTec.Api.Security.RateLimiting;
+using SabemiTec.Api.Configurations.RateLimiting;
 
 namespace SabemiTec.Api.Features.Webhooks.RouteHandler;
 

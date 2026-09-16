@@ -1,4 +1,4 @@
-namespace SabemiTec.Api.Security.RateLimiting;
+namespace SabemiTec.Api.Configurations.RateLimiting;
 
 public sealed class RateLimitOptions
 {
