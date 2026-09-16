@@ -16,10 +16,6 @@ export interface PaymentListItem {
   processedAt: string | null
 }
 
-export interface PaymentDetail extends PaymentListItem {
-  rawPayload: string
-}
-
 export interface PaymentsResponse {
   items: PaymentListItem[]
   page: number

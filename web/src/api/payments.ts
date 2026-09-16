@@ -1,5 +1,5 @@
 import { apiGet } from './client'
-import type { PaymentDetail, PaymentFilters, PaymentsResponse, PaymentStats } from './types'
+import type { PaymentFilters, PaymentsResponse, PaymentStats } from './types'
 
 export function getPayments(filters: PaymentFilters): Promise<PaymentsResponse> {
   const params = new URLSearchParams()
@@ -9,10 +9,6 @@ export function getPayments(filters: PaymentFilters): Promise<PaymentsResponse> 
   params.set('pageSize', String(filters.pageSize))
 
   return apiGet(`/api/payments?${params.toString()}`)
-}
-
-export function getPaymentById(id: number): Promise<PaymentDetail> {
-  return apiGet(`/api/payments/${id}`)
 }
 
 export function getPaymentStats(): Promise<PaymentStats> {

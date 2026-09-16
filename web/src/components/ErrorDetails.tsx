@@ -1,13 +1,11 @@
-import { usePaymentDetail } from '../hooks/usePaymentDetail'
+import { formatCurrency, formatDate } from '../lib/format'
 import type { PaymentListItem } from '../api/types'
 
-// Fetches and displays the raw payload plus the error text — this is where an operator
-// investigating an incident actually clicks first.
+// Shows the fields the API already parsed out of the payload, not the raw JSON — an
+// operator wants "o que o banco mandou", not snake_case/aspas pra decifrar.
 export function ErrorDetails({ item }: { item: PaymentListItem }) {
-  const { data, isLoading } = usePaymentDetail(item.id, true)
-
   return (
-    <div className="space-y-2 border-t border-red-200 bg-red-50/50 px-4 py-3 text-sm">
+    <div className="space-y-3 border-t border-red-200 bg-red-50/50 px-4 py-3 text-sm">
       {item.validationError && (
         <p>
           <span className="font-medium text-red-800">Erro de validação: </span>
@@ -26,15 +24,27 @@ export function ErrorDetails({ item }: { item: PaymentListItem }) {
       </p>
 
       <div>
-        <p className="mb-1 font-medium text-red-800">Payload recebido:</p>
-        {isLoading ? (
-          <p className="text-gray-500">Carregando…</p>
-        ) : (
-          <pre className="overflow-x-auto rounded bg-gray-900 p-3 text-xs text-gray-100">
-            {data ? JSON.stringify(JSON.parse(data.rawPayload), null, 2) : '—'}
-          </pre>
-        )}
+        <p className="mb-2 font-medium text-red-800">Dados recebidos do banco:</p>
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
+          <Field
+            label="Transação"
+            value={item.transactionId.startsWith('MISSING:') ? 'Não informada' : item.transactionId}
+          />
+          <Field label="Contrato" value={item.contractId ?? 'Não informado'} />
+          <Field label="Valor" value={formatCurrency(item.amount)} />
+          <Field label="Data de pagamento" value={formatDate(item.paymentDate)} />
+          <Field label="Status informado" value={item.paymentStatus ?? 'Não informado'} />
+        </dl>
       </div>
+    </div>
+  )
+}
+
+function Field({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-xs font-medium tracking-wide text-gray-500 uppercase">{label}</dt>
+      <dd className="text-gray-800">{value}</dd>
     </div>
   )
 }
