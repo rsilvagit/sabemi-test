@@ -6,9 +6,23 @@ server {
     # untouched.
     listen ${PORT};
 
+    # Required when API_ORIGIN is a public https:// host behind its own TLS-terminating
+    # edge (e.g. Render): proxy_pass alone resolves the hostname once at nginx startup and
+    # connects without SNI, which that kind of edge rejects with a bare TLS handshake
+    # failure (alert 40) — it can't tell which backend to route to. Using a variable forces
+    # per-request DNS resolution instead of a stale cached IP, and proxy_ssl_server_name
+    # sends the upstream's own hostname as SNI.
+    # ${RESOLVER} must be Docker's embedded DNS (127.0.0.11, the Dockerfile default) to
+    # resolve the docker-compose service name "api" locally; on Render (or anywhere
+    # API_ORIGIN is a public hostname, not a container name) it needs a real DNS server
+    # instead, e.g. "1.1.1.1 8.8.8.8" — set as the RESOLVER env var on that service.
+    resolver ${RESOLVER} valid=30s;
+
     location /api/ {
-        proxy_pass ${API_ORIGIN};
-        proxy_set_header Host $host;
+        set $api_upstream ${API_ORIGIN};
+        proxy_pass $api_upstream;
+        proxy_ssl_server_name on;
+        proxy_set_header Host $proxy_host;
         # The dashboard never learns the key — nginx injects it server-side on every
         # proxied request, keeping it out of the JS bundle and swappable per environment
         # (same reasoning as API_ORIGIN above) instead of baked in at `npm run build`.
@@ -16,8 +30,10 @@ server {
     }
 
     location /webhooks/ {
-        proxy_pass ${API_ORIGIN};
-        proxy_set_header Host $host;
+        set $api_upstream ${API_ORIGIN};
+        proxy_pass $api_upstream;
+        proxy_ssl_server_name on;
+        proxy_set_header Host $proxy_host;
     }
 
     location / {

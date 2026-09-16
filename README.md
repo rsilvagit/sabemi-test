@@ -342,10 +342,13 @@ quem builda é o GitHub Actions):
   |---|---|
   | `API_ORIGIN` | a URL pública do `sabemi-api` (ex.: `https://sabemi-api.onrender.com`) |
   | `WEBHOOK_API_KEY` | a **mesma** chave configurada em `Webhook__ApiKey` no `sabemi-api` |
+  | `RESOLVER` | `1.1.1.1 8.8.8.8` (o default `127.0.0.11` só resolve o nome de serviço do docker-compose, não um hostname público) |
 - O nginx dentro da imagem usa `API_ORIGIN` para fazer proxy de `/api` e `/webhooks` até a
   API — o mesmo mecanismo que evita CORS localmente (`web/nginx.conf.template`) — e injeta
   `WEBHOOK_API_KEY` como header `X-Api-Key` em toda chamada a `/api`, autenticando o
-  dashboard sem expor a chave no bundle JS.
+  dashboard sem expor a chave no bundle JS. `RESOLVER` existe porque, atrás de um edge com
+  TLS por hostname (Render), o proxy precisa reresolver o DNS a cada request e enviar SNI —
+  sem isso o handshake TLS falha com "alert handshake failure".
 
 Em ambos os serviços, pegue a **Deploy Hook URL** em *Settings → Deploy Hook* — é o que o
 GitHub Actions vai chamar a cada push.
