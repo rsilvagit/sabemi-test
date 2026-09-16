@@ -115,7 +115,9 @@ static async Task SendOneAsync(HttpClient client, string[] contractIds, Cancella
 
 // Weighted so the dashboard keeps showing a realistic mix of outcomes: mostly paid,
 // some bank-side failures, and a slice of malformed payloads that exercise the
-// validation-error path (missing id_transacao, negative value, unknown status).
+// validation-error path (missing id_transacao, unknown status). No negative-value case —
+// this is loan/insurance installment liquidation, not an account debit; the bank has no
+// concept of a "withdrawal" here, so a negative valor was never a realistic payload.
 static Dictionary<string, object?> BuildPayload(string[] contractIds)
 {
     var random = Random.Shared;
@@ -128,8 +130,7 @@ static Dictionary<string, object?> BuildPayload(string[] contractIds)
     {
         < 0.65 => Payload(transactionId, contractId, amount, paymentDate, "PAGO"),
         < 0.85 => Payload(transactionId, contractId, amount, paymentDate, "FALHA"),
-        < 0.92 => PayloadWithoutTransactionId(contractId, amount, paymentDate),
-        < 0.97 => Payload(transactionId, contractId, -amount, paymentDate, "PAGO"),
+        < 0.95 => PayloadWithoutTransactionId(contractId, amount, paymentDate),
         _ => Payload(transactionId, contractId, amount, paymentDate, "DESCONHECIDO"),
     };
 }
