@@ -1,0 +1,57 @@
+name: Deploy API
+
+# Manual only: builds, tests and pushes a fresh :latest API image, then tells Render
+# to redeploy it. Independent from the web pipeline — running this never touches the
+# web image or the web Render service.
+on:
+  workflow_dispatch: {}
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Run backend test suite
+        run: dotnet test --configuration Release
+
+  build-and-deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # GHCR requires lowercase image paths; the repo owner/name can contain uppercase.
+      - name: Compute lowercase image name
+        id: image-name
+        run: echo "owner=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: src/SabemiTec.Api/Dockerfile
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ steps.image-name.outputs.owner }}-api:latest
+
+      # Render redeploys by re-pulling the `:latest` tag from the registry whenever its
+      # Deploy Hook URL receives a POST.
+      - name: Trigger Render deploy — API
+        run: curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_API }}"
