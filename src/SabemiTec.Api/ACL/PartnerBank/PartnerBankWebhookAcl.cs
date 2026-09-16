@@ -1,6 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
-using SabemiTec.Api.ACL.PartnerBank.Dto;
+using SabemiTec.Api.ACL.PartnerBank.DTO;
 using SabemiTec.Api.ACL.Responses;
 using SabemiTec.Api.Enum;
 

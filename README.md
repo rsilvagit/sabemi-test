@@ -358,13 +358,14 @@ A partir daí, todo push em `main` builda, testa e redeploya sozinho.
 ```
 src/SabemiTec.Api/
 ├── ACL/PartnerBank/        # fronteira com o payload do banco parceiro
+├── Enum/                   # enums-como-classe (Enumeration + derivados)
 ├── Features/
 │   ├── Webhooks/           # POST /webhooks/pagamento — ingestão + idempotência
 │   ├── Processing/         # worker: claim, delay, upsert, retry/dead-letter
 │   └── Dashboard/          # GET /api/payments — leitura, filtros, stats
-├── Persistence/            # IUnitOfWork, Dapper, SQL, migrations (DbUp)
-├── Security/                # ApiKey + rate limiting
-└── Configurations/Extensions/  # DI e mapeamento de rotas
+├── Database/PostgreSQL/    # IUnitOfWork, Dapper, SQL, migrations (DbUp)
+├── Middlewares/            # ApiKeyAuthMiddleware
+└── Configurations/         # DI, RateLimiting, mapeamento de rotas
 
 web/src/
 ├── api/                    # client, chamadas, tipos

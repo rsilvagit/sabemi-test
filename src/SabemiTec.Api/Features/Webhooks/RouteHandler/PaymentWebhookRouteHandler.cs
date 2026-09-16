@@ -1,6 +1,7 @@
 using System.Text.Json;
-using SabemiTec.Api.Features.Webhooks.Services;
 using SabemiTec.Api.Configurations.RateLimiting;
+using SabemiTec.Api.Features.Webhooks.DTO;
+using SabemiTec.Api.Features.Webhooks.Services;
 
 namespace SabemiTec.Api.Features.Webhooks.RouteHandler;
 
@@ -43,20 +44,14 @@ public static class PaymentWebhookRouteHandler
 
         return result.Outcome switch
         {
-            IngestOutcome.Accepted => Results.Accepted($"/api/payments/{result.EventId}", new
-            {
-                id = result.EventId,
-                transactionId = result.TransactionId,
-                status = "Accepted"
-            }),
+            IngestOutcome.Accepted => Results.Accepted(
+                $"/api/payments/{result.EventId}",
+                new PaymentAcceptedResponse(result.EventId, result.TransactionId, "Accepted")),
             IngestOutcome.Duplicate => DuplicateResult(httpContext, result),
             IngestOutcome.Rejected => Results.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "Invalid payload.",
-                extensions: new Dictionary<string, object?>
-                {
-                    ["errors"] = result.Errors.Select(e => new { field = e.Field, message = e.Message })
-                }),
+                extensions: new Dictionary<string, object?> { ["errors"] = result.Errors }),
             _ => Results.Problem(statusCode: StatusCodes.Status500InternalServerError)
         };
     }
@@ -64,12 +59,6 @@ public static class PaymentWebhookRouteHandler
     private static IResult DuplicateResult(HttpContext httpContext, IngestPaymentResult result)
     {
         httpContext.Response.Headers["X-Idempotent-Replay"] = "true";
-        return Results.Ok(new
-        {
-            id = result.EventId,
-            transactionId = result.TransactionId,
-            duplicate = true,
-            status = "Duplicate"
-        });
+        return Results.Ok(new PaymentDuplicateResponse(result.EventId, result.TransactionId, Duplicate: true, Status: "Duplicate"));
     }
 }

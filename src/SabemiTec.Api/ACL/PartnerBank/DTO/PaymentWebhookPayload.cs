@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace SabemiTec.Api.ACL.PartnerBank.Dto;
+namespace SabemiTec.Api.ACL.PartnerBank.DTO;
 
 /// <summary>
 /// Mirrors the partner bank's contract literally. This is the only place in the codebase
