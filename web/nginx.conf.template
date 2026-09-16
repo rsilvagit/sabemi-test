@@ -4,25 +4,19 @@ server {
     # /etc/nginx/templates/*.template). It only replaces names that are actually set as
     # environment variables, so nginx's own runtime vars ($host, $uri, ...) below are left
     # untouched.
+    #
+    # API_ORIGIN must be a plain http:// hostname resolvable at container start — the
+    # docker-compose service name locally ("http://api:8080"), or Render's private-network
+    # address in production ("http://sabemi-api:10000", see README). Deliberately NOT a
+    # public https:// URL: proxying to one from here would mean re-terminating TLS through
+    # whatever edge fronts that public host, which needs per-request DNS + explicit SNI and
+    # still isn't guaranteed to work (hit a bare "SSL alert handshake failure" against
+    # Render's own edge). Private networking sidesteps that entirely — no public hop, no TLS.
     listen ${PORT};
 
-    # Required when API_ORIGIN is a public https:// host behind its own TLS-terminating
-    # edge (e.g. Render): proxy_pass alone resolves the hostname once at nginx startup and
-    # connects without SNI, which that kind of edge rejects with a bare TLS handshake
-    # failure (alert 40) — it can't tell which backend to route to. Using a variable forces
-    # per-request DNS resolution instead of a stale cached IP, and proxy_ssl_server_name
-    # sends the upstream's own hostname as SNI.
-    # ${RESOLVER} must be Docker's embedded DNS (127.0.0.11, the Dockerfile default) to
-    # resolve the docker-compose service name "api" locally; on Render (or anywhere
-    # API_ORIGIN is a public hostname, not a container name) it needs a real DNS server
-    # instead, e.g. "1.1.1.1 8.8.8.8" — set as the RESOLVER env var on that service.
-    resolver ${RESOLVER} valid=30s;
-
     location /api/ {
-        set $api_upstream ${API_ORIGIN};
-        proxy_pass $api_upstream;
-        proxy_ssl_server_name on;
-        proxy_set_header Host $proxy_host;
+        proxy_pass ${API_ORIGIN};
+        proxy_set_header Host $host;
         # The dashboard never learns the key — nginx injects it server-side on every
         # proxied request, keeping it out of the JS bundle and swappable per environment
         # (same reasoning as API_ORIGIN above) instead of baked in at `npm run build`.
@@ -30,10 +24,8 @@ server {
     }
 
     location /webhooks/ {
-        set $api_upstream ${API_ORIGIN};
-        proxy_pass $api_upstream;
-        proxy_ssl_server_name on;
-        proxy_set_header Host $proxy_host;
+        proxy_pass ${API_ORIGIN};
+        proxy_set_header Host $host;
     }
 
     location / {
