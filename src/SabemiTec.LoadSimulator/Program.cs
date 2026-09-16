@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 
@@ -20,8 +21,6 @@ var concurrentRequests = int.TryParse(Environment.GetEnvironmentVariable("CONCUR
     ? Math.Max(1, concurrency)
     : 5;
 
-var contractIds = new[] { "CT-1001", "CT-1002", "CT-1003", "CT-1004", "CT-1005", "CT-1006", "CT-1007", "CT-1008" };
-
 // A single HttpClient is thread-safe for concurrent requests by design; Random.Shared (not
 // `new Random()`) is what makes BuildPayload safe to call from multiple tasks at once.
 using var client = new HttpClient { BaseAddress = new Uri(apiUrl) };
@@ -31,8 +30,13 @@ using var cts = new CancellationTokenSource();
 Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
 AppDomain.CurrentDomain.ProcessExit += (_, _) => cts.Cancel();
 
+// Pulled from GET /api/payments/contracts instead of hardcoded, so this never drifts from
+// what is actually seeded (migration 0002) — a hardcoded duplicate list here would silently
+// go stale the moment the seed changes.
+var contractIds = await FetchContractIdsAsync(client, cts.Token);
+
 Console.WriteLine(
-    $"Load simulator started. Target={apiUrl} Interval={intervalSeconds}s ConcurrentRequests={concurrentRequests}");
+    $"Load simulator started. Target={apiUrl} Interval={intervalSeconds}s ConcurrentRequests={concurrentRequests} Contracts={contractIds.Length}");
 
 using var timer = new PeriodicTimer(TimeSpan.FromSeconds(intervalSeconds));
 
@@ -46,6 +50,43 @@ do
 } while (await timer.WaitForNextTickAsync(cts.Token));
 
 return;
+
+// The API container may not be reachable yet on cold start (compose brings services up in
+// parallel), so this retries a handful of times before giving up. If the endpoint is
+// unreachable or returns no contracts (e.g. an older API without migration 0002 applied),
+// falls back to the same fixed list the seed uses today — keeps the worker usable, just
+// without the drift protection.
+static async Task<string[]> FetchContractIdsAsync(HttpClient client, CancellationToken ct)
+{
+    string[] fallback = ["CT-1001", "CT-1002", "CT-1003", "CT-1004", "CT-1005", "CT-1006", "CT-1007", "CT-1008"];
+
+    for (var attempt = 1; attempt <= 5; attempt++)
+    {
+        try
+        {
+            var response = await client.GetAsync("/api/payments/contracts", ct);
+            if (response.IsSuccessStatusCode)
+            {
+                var contractIds = await response.Content.ReadFromJsonAsync<string[]>(cancellationToken: ct);
+                if (contractIds is { Length: > 0 })
+                {
+                    return contractIds;
+                }
+            }
+
+            Console.WriteLine($"[{DateTime.UtcNow:O}] GET /api/payments/contracts -> HTTP {(int)response.StatusCode} (tentativa {attempt}/5)");
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Console.WriteLine($"[{DateTime.UtcNow:O}] falha ao buscar contratos (tentativa {attempt}/5): {ex.Message}");
+        }
+
+        await Task.Delay(TimeSpan.FromSeconds(3), ct);
+    }
+
+    Console.WriteLine($"[{DateTime.UtcNow:O}] usando lista de contratos fixa de fallback ({fallback.Length} contratos).");
+    return fallback;
+}
 
 static async Task SendOneAsync(HttpClient client, string[] contractIds, CancellationToken ct)
 {

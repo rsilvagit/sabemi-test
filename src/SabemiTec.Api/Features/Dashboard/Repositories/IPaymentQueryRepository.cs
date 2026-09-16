@@ -45,4 +45,9 @@ public interface IPaymentQueryRepository
     Task<PaymentDetail?> FindByIdAsync(long id, CancellationToken ct);
 
     Task<PaymentStats> GetStatsAsync(CancellationToken ct);
+
+    /// <summary>The known contract IDs (demo master data, see migration 0002) — lets clients
+    /// that generate synthetic traffic (SabemiTec.LoadSimulator) target real contracts
+    /// instead of hardcoding a list that can drift from what is actually seeded.</summary>
+    Task<IReadOnlyList<string>> ListContractIdsAsync(CancellationToken ct);
 }

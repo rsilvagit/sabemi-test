@@ -62,4 +62,10 @@ internal sealed class PaymentQueryRepository(IDatabaseConnection db) : IPaymentQ
         var cmd = new CommandDefinition(PaymentQuerySql.Stats, cancellationToken: ct);
         return await db.Connection.QuerySingleAsync<PaymentStats>(cmd);
     }
+
+    public async Task<IReadOnlyList<string>> ListContractIdsAsync(CancellationToken ct)
+    {
+        var cmd = new CommandDefinition(PaymentQuerySql.ListContractIds, cancellationToken: ct);
+        return (await db.Connection.QueryAsync<string>(cmd)).AsList();
+    }
 }

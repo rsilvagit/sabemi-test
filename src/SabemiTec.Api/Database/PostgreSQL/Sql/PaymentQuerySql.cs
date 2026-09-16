@@ -73,4 +73,6 @@ internal static class PaymentQuerySql
         left join contract c on c.contract_id = e.contract_id
         where e.id = @Id;
         """;
+
+    public static readonly string ListContractIds = "select contract_id from contract order by contract_id;";
 }

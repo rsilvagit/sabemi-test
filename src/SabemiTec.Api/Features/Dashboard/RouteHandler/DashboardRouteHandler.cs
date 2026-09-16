@@ -37,6 +37,15 @@ public static class DashboardRouteHandler
             .Produces(StatusCodes.Status429TooManyRequests)
             .WithOpenApi();
 
+        // Demo-only: lets a synthetic traffic generator (SabemiTec.LoadSimulator) target
+        // real seeded contracts instead of hardcoding a list that can drift from the DB.
+        group.MapGet("/contracts", GetContractIdsAsync)
+            .WithName("ListContractIds")
+            .Produces(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status429TooManyRequests)
+            .WithOpenApi();
+
         return app;
     }
 
@@ -75,6 +84,14 @@ public static class DashboardRouteHandler
 
         var stats = await repository.GetStatsAsync(ct);
         return Results.Ok(new PaymentStatsDto(stats.Total, stats.Success, stats.Error, stats.Pending));
+    }
+
+    private static async Task<IResult> GetContractIdsAsync(IPaymentQueryRepository repository, IUnitOfWork uow, CancellationToken ct)
+    {
+        uow.Open();
+
+        var contractIds = await repository.ListContractIdsAsync(ct);
+        return Results.Ok(contractIds);
     }
 
     private static PaymentListItemDto ToDto(PaymentListItem item) => new(
