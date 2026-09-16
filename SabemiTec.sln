@@ -11,6 +11,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{76BF7994
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SabemiTec.Tests", "tests\SabemiTec.Tests\SabemiTec.Tests.csproj", "{694212E0-7CA4-4EFE-AC01-DEE16C5AAA15}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SabemiTec.LoadSimulator", "src\SabemiTec.LoadSimulator\SabemiTec.LoadSimulator.csproj", "{9DA598B2-7837-41F8-AD2A-342582F48BA3}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -28,9 +30,14 @@ Global
 		{694212E0-7CA4-4EFE-AC01-DEE16C5AAA15}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{694212E0-7CA4-4EFE-AC01-DEE16C5AAA15}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{694212E0-7CA4-4EFE-AC01-DEE16C5AAA15}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9DA598B2-7837-41F8-AD2A-342582F48BA3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9DA598B2-7837-41F8-AD2A-342582F48BA3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9DA598B2-7837-41F8-AD2A-342582F48BA3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9DA598B2-7837-41F8-AD2A-342582F48BA3}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{C6F8A4B2-39C2-43AB-B10C-66FD98FD24AF} = {3255D43A-C64B-4E32-8997-C375CEC7D477}
 		{694212E0-7CA4-4EFE-AC01-DEE16C5AAA15} = {76BF7994-3EA0-4393-A10D-DA17B08781C9}
+		{9DA598B2-7837-41F8-AD2A-342582F48BA3} = {3255D43A-C64B-4E32-8997-C375CEC7D477}
 	EndGlobalSection
 EndGlobal

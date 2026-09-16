@@ -313,17 +313,20 @@ com `SimulatedDelayMs: 0`.
 
 ## Deploy (Render + Supabase, via GitHub Actions)
 
-Pipeline: push em `main` → `.github/workflows/deploy.yml` roda a suíte de testes → builda e
-publica as duas imagens Docker no GitHub Container Registry (`ghcr.io`), com a tag `:latest`
-pronta pra puxar. **O redeploy no Render não acontece sozinho no push** — ele é um gate
-manual: em *Actions → Build, test and deploy → Run workflow* (`workflow_dispatch`), o job
-`deploy` dispara os Deploy Hooks. Push sempre valida e publica a imagem; quem decide subir
-pro ar é você, rodando o workflow manualmente quando quiser. O Render **não** builda a
-partir do repositório — ele só puxa a imagem já publicada.
+Pipeline dividido por aplicação, cada uma independente:
+
+- `.github/workflows/ci.yml` — roda a suíte de testes a cada push em `main`. Não publica
+  imagem nem faz deploy.
+- `.github/workflows/deploy-api.yml`, `deploy-web.yml`, `deploy-load-simulator.yml` — cada
+  um é **manual** (`workflow_dispatch`, em *Actions → escolha o workflow → Run workflow*),
+  autocontido: testa (só o da API), builda a imagem daquela aplicação, publica no GitHub
+  Container Registry (`ghcr.io`) com a tag `:latest` e dispara o Deploy Hook do respectivo
+  serviço no Render. Rodar o deploy de uma aplicação nunca builda nem redeploya as outras.
+  O Render **não** builda a partir do repositório — ele só puxa a imagem já publicada.
 
 O que eu não consigo fazer por você (exige login nas suas contas): criar o projeto no
-Supabase, criar os dois serviços no Render, e cadastrar os secrets no GitHub. O passo a
-passo abaixo é exatamente o que clicar.
+Supabase, criar os serviços no Render, e cadastrar os secrets no GitHub. O passo a passo
+abaixo é exatamente o que clicar.
 
 ### 1. Banco (Supabase)
 
@@ -342,8 +345,8 @@ passo abaixo é exatamente o que clicar.
 
 ### 2. Serviços (Render)
 
-Crie **dois** Web Services, ambos como **"Existing Image"** (não "Build from a repository" —
-quem builda é o GitHub Actions):
+Crie **dois** Web Services e, opcionalmente, **um** Background Worker, todos como
+**"Existing Image"** (não "Build from a repository" — quem builda é o GitHub Actions):
 
 **`sabemi-api`**
 - Imagem: `ghcr.io/<seu-usuario>/<repo>-api:latest`
@@ -371,8 +374,23 @@ quem builda é o GitHub Actions):
   `sabemi-web` não consegue proxyar pro `sabemi-api` lá, então o browser chama a API
   diretamente e manda a chave ele mesmo.
 
-Em ambos os serviços, pegue a **Deploy Hook URL** em *Settings → Deploy Hook* — é o que o
-GitHub Actions vai chamar a cada push.
+**`sabemi-load-simulator`** (opcional — só pra manter o dashboard mostrando movimento ao
+vivo na demo; não é parte do requisito)
+- Tipo: **Background Worker**, não Web Service — não recebe tráfego HTTP de entrada.
+- Imagem: `ghcr.io/<seu-usuario>/<repo>-load-simulator:latest`
+- Variáveis de ambiente:
+  | Nome | Valor |
+  |---|---|
+  | `API_URL` | a URL pública do `sabemi-api` (ex.: `https://sabemi-api.onrender.com`) |
+  | `WEBHOOK_API_KEY` | a mesma chave real do `Webhook__ApiKey` do `sabemi-api` |
+  | `INTERVAL_SECONDS` | `5` (opcional, é o default) |
+- Faz exatamente o que um banco parceiro real faria: chama `POST /webhooks/pagamento` no
+  `sabemi-api` periodicamente, com uma mistura de payloads válidos (pago/falha) e inválidos
+  (sem `id_transacao`, valor negativo, status desconhecido), pra exercitar todos os estados
+  do dashboard.
+
+Em todos os serviços, pegue a **Deploy Hook URL** em *Settings → Deploy Hook* — é o que o
+GitHub Actions vai chamar quando você rodar o workflow manual daquela aplicação.
 
 **Visibilidade do pacote no GHCR**: por padrão o GHCR publica os pacotes como privados. Ou
 você torna as duas imagens públicas (*Package settings → Change visibility*, mais simples
@@ -387,12 +405,14 @@ Em *Settings → Secrets and variables → Actions* do repositório:
 |---|---|
 | `RENDER_DEPLOY_HOOK_API` | Deploy Hook do serviço `sabemi-api` |
 | `RENDER_DEPLOY_HOOK_WEB` | Deploy Hook do serviço `sabemi-web` |
+| `RENDER_DEPLOY_HOOK_LOAD_SIMULATOR` | Deploy Hook do serviço `sabemi-load-simulator` (só se você criou esse worker) |
 | `WEBHOOK_API_KEY` | a mesma chave real usada em `Webhook__ApiKey` no `sabemi-api` — bakeada no bundle do `sabemi-web` em build time |
 
 `GITHUB_TOKEN` (usado para publicar no GHCR) já existe automaticamente em todo repositório —
 não precisa criar.
 
-A partir daí, todo push em `main` builda, testa e redeploya sozinho.
+A partir daí, todo push em `main` roda a suíte de testes (`ci.yml`); o deploy de cada
+aplicação é sempre manual, disparado por você em *Actions*.
 
 ## Estrutura
 
@@ -407,6 +427,8 @@ src/SabemiTec.Api/
 ├── Database/PostgreSQL/    # IUnitOfWork, Dapper, SQL, migrations (DbUp)
 ├── Middlewares/            # ApiKeyAuthMiddleware
 └── Configurations/         # DI, RateLimiting, mapeamento de rotas
+
+src/SabemiTec.LoadSimulator/  # worker standalone: gera carga sintética em POST /webhooks/pagamento
 
 web/src/
 ├── api/                    # client, chamadas, tipos

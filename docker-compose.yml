@@ -40,5 +40,19 @@ services:
     depends_on:
       - api
 
+  # Opt-in: `docker compose --profile simulator up` to keep the dashboard showing live
+  # movement. Off by default so a plain `docker compose up` stays quiet.
+  load-simulator:
+    profiles: ["simulator"]
+    build:
+      context: .
+      dockerfile: src/SabemiTec.LoadSimulator/Dockerfile
+    environment:
+      API_URL: "http://api:8080"
+      WEBHOOK_API_KEY: ${WEBHOOK_API_KEY:-dev-local-key}
+      INTERVAL_SECONDS: "5"
+    depends_on:
+      - api
+
 volumes:
   pgdata:
