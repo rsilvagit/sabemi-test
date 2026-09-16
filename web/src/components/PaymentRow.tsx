@@ -22,7 +22,7 @@ export function PaymentRow({ item }: { item: PaymentListItem }) {
         <td className="px-4 py-3 text-primary-700">{item.contractId ?? '—'}</td>
         <td className="px-4 py-3">{formatCurrency(item.amount)}</td>
         <td className="px-4 py-3">
-          <StatusBadge status={item.effectiveStatus} />
+          <StatusBadge status={item.effectiveStatus} errorCategory={item.errorCategory} />
         </td>
         <td className="px-4 py-3 text-gray-500">{formatDate(item.receivedAt)}</td>
         <td className="px-4 py-3 text-gray-500">{formatDate(item.processedAt)}</td>

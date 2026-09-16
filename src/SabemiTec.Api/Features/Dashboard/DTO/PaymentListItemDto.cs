@@ -9,6 +9,7 @@ public record PaymentListItemDto(
     string? PaymentStatus,
     short ProcessingStatus,
     string EffectiveStatus,
+    string? ErrorCategory,
     int Attempts,
     string? LastError,
     string? ValidationError,

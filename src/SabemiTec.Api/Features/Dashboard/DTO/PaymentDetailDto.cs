@@ -9,6 +9,7 @@ public sealed record PaymentDetailDto(
     string? PaymentStatus,
     short ProcessingStatus,
     string EffectiveStatus,
+    string? ErrorCategory,
     int Attempts,
     string? LastError,
     string? ValidationError,
