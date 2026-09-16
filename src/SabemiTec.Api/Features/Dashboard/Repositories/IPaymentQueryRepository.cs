@@ -27,7 +27,7 @@ public sealed class PaymentDetail : PaymentListItem
     public string Payload { get; init; } = default!;
 }
 
-public sealed record PaymentQuery(string? Status, string? ContractId, int Page, int PageSize);
+public sealed record PaymentQuery(string? Status, string? ContractId, string? ContractType, int Page, int PageSize);
 
 public sealed class PaymentStats
 {

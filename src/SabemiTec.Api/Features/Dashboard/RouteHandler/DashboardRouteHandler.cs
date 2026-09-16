@@ -55,12 +55,13 @@ public static class DashboardRouteHandler
         CancellationToken ct,
         string? status = null,
         string? contractId = null,
+        string? contractType = null,
         int page = 1,
         int pageSize = 25)
     {
         uow.Open();
 
-        var query = new PaymentQuery(status, contractId, page <= 0 ? 1 : page, pageSize <= 0 ? 25 : pageSize);
+        var query = new PaymentQuery(status, contractId, contractType, page <= 0 ? 1 : page, pageSize <= 0 ? 25 : pageSize);
         var (items, hasMore) = await repository.SearchAsync(query, ct);
 
         return Results.Ok(new SearchPaymentsResponse(

@@ -38,6 +38,7 @@ export interface PaymentsResponse {
 export interface PaymentFilters {
   status?: EffectiveStatus
   contractId?: string
+  contractType?: Exclude<ContractType, null>
   page: number
   pageSize: number
 }

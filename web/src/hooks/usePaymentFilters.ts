@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { EffectiveStatus, PaymentFilters } from '../api/types'
+import type { ContractType, EffectiveStatus, PaymentFilters } from '../api/types'
 
 const DEFAULT_PAGE_SIZE = 25
 
@@ -10,6 +10,7 @@ function readFromUrl(): PaymentFilters {
   return {
     status: (params.get('status') as EffectiveStatus | null) ?? undefined,
     contractId: params.get('contractId') ?? undefined,
+    contractType: (params.get('contractType') as Exclude<ContractType, null> | null) ?? undefined,
     page: Number(params.get('page') ?? '1') || 1,
     pageSize: Number(params.get('pageSize') ?? String(DEFAULT_PAGE_SIZE)) || DEFAULT_PAGE_SIZE,
   }
@@ -22,6 +23,7 @@ export function usePaymentFilters() {
     const params = new URLSearchParams()
     if (filters.status) params.set('status', filters.status)
     if (filters.contractId) params.set('contractId', filters.contractId)
+    if (filters.contractType) params.set('contractType', filters.contractType)
     params.set('page', String(filters.page))
     params.set('pageSize', String(filters.pageSize))
     const query = params.toString()
@@ -39,6 +41,10 @@ export function usePaymentFilters() {
     setFiltersState((f) => ({ ...f, contractId, page: 1 }))
   }, [])
 
+  const setContractType = useCallback((contractType: Exclude<ContractType, null> | undefined) => {
+    setFiltersState((f) => ({ ...f, contractType, page: 1 }))
+  }, [])
+
   const setPage = useCallback((page: number) => {
     setFiltersState((f) => ({ ...f, page }))
   }, [])
@@ -47,7 +53,7 @@ export function usePaymentFilters() {
     setFiltersState({ page: 1, pageSize: DEFAULT_PAGE_SIZE })
   }, [])
 
-  const hasActiveFilters = Boolean(filters.status || filters.contractId)
+  const hasActiveFilters = Boolean(filters.status || filters.contractId || filters.contractType)
 
-  return { filters, setStatus, setContractId, setPage, clear, hasActiveFilters }
+  return { filters, setStatus, setContractId, setContractType, setPage, clear, hasActiveFilters }
 }

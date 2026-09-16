@@ -8,7 +8,7 @@ import { useDashboardData } from '../hooks/useDashboardData'
 import { usePaymentFilters } from '../hooks/usePaymentFilters'
 
 export function Dashboard() {
-  const { filters, setStatus, setContractId, setPage, clear, hasActiveFilters } =
+  const { filters, setStatus, setContractId, setContractType, setPage, clear, hasActiveFilters } =
     usePaymentFilters()
   const [autoRefresh, setAutoRefresh] = useState(true)
 
@@ -32,9 +32,11 @@ export function Dashboard() {
         <FiltersBar
           status={filters.status}
           contractId={filters.contractId}
+          contractType={filters.contractType}
           hasActiveFilters={hasActiveFilters}
           onStatusChange={setStatus}
           onContractIdChange={setContractId}
+          onContractTypeChange={setContractType}
           onClear={clear}
         />
 

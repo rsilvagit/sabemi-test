@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { StatusBadge } from './StatusBadge'
-import { ErrorDetails } from './ErrorDetails'
+import { PaymentDetails } from './PaymentDetails'
 import { formatContractType, formatCurrency, formatDate } from '../lib/format'
 import type { PaymentListItem } from '../api/types'
 
@@ -30,10 +30,10 @@ export function PaymentRow({ item }: { item: PaymentListItem }) {
         <td className="px-4 py-3 text-gray-500">{formatDate(item.receivedAt)}</td>
         <td className="px-4 py-3 text-gray-500">{formatDate(item.processedAt)}</td>
       </tr>
-      {expanded && isError && (
+      {expanded && (
         <tr>
           <td colSpan={7} className="p-0">
-            <ErrorDetails item={item} />
+            <PaymentDetails item={item} />
           </td>
         </tr>
       )}

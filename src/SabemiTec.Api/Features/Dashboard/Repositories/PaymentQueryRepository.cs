@@ -27,6 +27,12 @@ internal sealed class PaymentQueryRepository(IDatabaseConnection db) : IPaymentQ
             parameters.Add("ContractPrefix", query.ContractId + "%");
         }
 
+        if (!string.IsNullOrWhiteSpace(query.ContractType))
+        {
+            predicates.Add("contract_type = @ContractType");
+            parameters.Add("ContractType", query.ContractType);
+        }
+
         var page = Math.Max(query.Page, 1);
         var pageSize = Math.Clamp(query.PageSize, 1, 100);
 

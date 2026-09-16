@@ -1,8 +1,6 @@
-import { Search } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
-import { useDebouncedValue } from '../hooks/useDebouncedValue'
+import { useContracts } from '../hooks/useContracts'
 import { Card } from './ui/Card'
-import type { EffectiveStatus } from '../api/types'
+import type { ContractType, EffectiveStatus } from '../api/types'
 
 const STATUS_OPTIONS: { value: EffectiveStatus | undefined; label: string }[] = [
   { value: undefined, label: 'Todos' },
@@ -11,42 +9,36 @@ const STATUS_OPTIONS: { value: EffectiveStatus | undefined; label: string }[] = 
   { value: 'Pending', label: 'Pendente' },
 ]
 
+const CONTRACT_TYPE_OPTIONS: { value: Exclude<ContractType, null> | undefined; label: string }[] = [
+  { value: undefined, label: 'Todos os tipos' },
+  { value: 'Emprestimo', label: 'Empréstimo' },
+  { value: 'Seguro', label: 'Seguro' },
+]
+
 interface FiltersBarProps {
   status: EffectiveStatus | undefined
   contractId: string | undefined
+  contractType: Exclude<ContractType, null> | undefined
   hasActiveFilters: boolean
   onStatusChange: (status: EffectiveStatus | undefined) => void
   onContractIdChange: (contractId: string | undefined) => void
+  onContractTypeChange: (contractType: Exclude<ContractType, null> | undefined) => void
   onClear: () => void
 }
 
 export function FiltersBar({
   status,
   contractId,
+  contractType,
   hasActiveFilters,
   onStatusChange,
   onContractIdChange,
+  onContractTypeChange,
   onClear,
 }: FiltersBarProps) {
-  // Local input state kept separate from the committed filter so typing feels instant;
-  // only the debounced value triggers a refetch (300ms — otherwise every keystroke is a
-  // request).
-  const [contractInput, setContractInput] = useState(contractId ?? '')
-  const debouncedContractId = useDebouncedValue(contractInput, 300)
-  const isFirstRender = useRef(true)
-
-  useEffect(() => {
-    setContractInput(contractId ?? '')
-  }, [contractId])
-
-  useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false
-      return
-    }
-    onContractIdChange(debouncedContractId || undefined)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedContractId])
+  // Real contracts (migration 0002), not free text — avoids filtering by an ID that was
+  // typed wrong or never existed.
+  const { data: contracts } = useContracts()
 
   return (
     <Card className="flex flex-wrap items-center gap-3 p-4">
@@ -67,19 +59,30 @@ export function FiltersBar({
         ))}
       </div>
 
-      <div className="relative min-w-[220px] flex-1">
-        <Search
-          className="pointer-events-none absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-gray-400"
-          aria-hidden="true"
-        />
-        <input
-          type="text"
-          value={contractInput}
-          onChange={(e) => setContractInput(e.target.value)}
-          placeholder="Filtrar por ID do contrato..."
-          className="w-full rounded-md border border-gray-300 py-1.5 pr-3 pl-9 text-sm placeholder:text-gray-400 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 focus:outline-none"
-        />
-      </div>
+      <select
+        value={contractId ?? ''}
+        onChange={(e) => onContractIdChange(e.target.value || undefined)}
+        className="min-w-[180px] rounded-md border border-gray-300 py-1.5 px-3 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500 focus:outline-none"
+      >
+        <option value="">Todos os contratos</option>
+        {contracts?.map((id) => (
+          <option key={id} value={id}>
+            {id}
+          </option>
+        ))}
+      </select>
+
+      <select
+        value={contractType ?? ''}
+        onChange={(e) => onContractTypeChange((e.target.value as Exclude<ContractType, null>) || undefined)}
+        className="min-w-[160px] rounded-md border border-gray-300 py-1.5 px-3 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500 focus:outline-none"
+      >
+        {CONTRACT_TYPE_OPTIONS.map((option) => (
+          <option key={option.label} value={option.value ?? ''}>
+            {option.label}
+          </option>
+        ))}
+      </select>
 
       {hasActiveFilters && (
         <button

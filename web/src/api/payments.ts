@@ -5,6 +5,7 @@ export function getPayments(filters: PaymentFilters): Promise<PaymentsResponse> 
   const params = new URLSearchParams()
   if (filters.status) params.set('status', filters.status)
   if (filters.contractId) params.set('contractId', filters.contractId)
+  if (filters.contractType) params.set('contractType', filters.contractType)
   params.set('page', String(filters.page))
   params.set('pageSize', String(filters.pageSize))
 
