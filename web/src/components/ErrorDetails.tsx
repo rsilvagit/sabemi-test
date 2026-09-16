@@ -33,7 +33,7 @@ export function ErrorDetails({ item }: { item: PaymentListItem }) {
           <Field label="Contrato" value={item.contractId ?? 'Não informado'} />
           <Field label="Valor" value={formatCurrency(item.amount)} />
           <Field label="Data de pagamento" value={formatDate(item.paymentDate)} />
-          <Field label="Status informado" value={item.paymentStatus ?? 'Não informado'} />
+          <Field label="Status (banco)" value={item.paymentStatus ?? 'Não informado'} />
         </dl>
       </div>
     </div>
