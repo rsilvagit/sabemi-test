@@ -53,6 +53,17 @@ public sealed class PaymentStats
     public long Pending { get; init; }
 }
 
+// Demo master data (migration 0002/0003) — full row, not just the ID, so a client generating
+// synthetic payments can post a valor consistent with the contract (total_value/installments)
+// instead of an arbitrary number.
+public sealed class Contract
+{
+    public string ContractId { get; init; } = default!;
+    public string ContractType { get; init; } = default!;
+    public int? Installments { get; init; }
+    public decimal? TotalValue { get; init; }
+}
+
 public interface IPaymentQueryRepository
 {
     /// <returns>Up to PageSize items, plus whether more exist beyond this page.</returns>
@@ -62,10 +73,11 @@ public interface IPaymentQueryRepository
 
     Task<PaymentStats> GetStatsAsync(CancellationToken ct);
 
-    /// <summary>The known contract IDs (demo master data, see migration 0002) — lets clients
-    /// that generate synthetic traffic (SabemiTec.LoadSimulator) target real contracts
-    /// instead of hardcoding a list that can drift from what is actually seeded.</summary>
-    Task<IReadOnlyList<string>> ListContractIdsAsync(CancellationToken ct);
+    /// <summary>The known contracts (demo master data, see migrations 0002/0003) — lets
+    /// clients that generate synthetic traffic (SabemiTec.LoadSimulator) target real
+    /// contracts, with real installments/total_value, instead of hardcoding a list or
+    /// posting an arbitrary valor that drifts from what is seeded.</summary>
+    Task<IReadOnlyList<Contract>> ListContractsAsync(CancellationToken ct);
 
     /// <returns>Up to PageSize items, plus whether more exist beyond this page.</returns>
     Task<(IReadOnlyList<InvalidPaymentEvent> Items, bool HasMore)> SearchInvalidAsync(int page, int pageSize, CancellationToken ct);

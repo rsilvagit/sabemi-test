@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { getContractIds } from '../api/contracts'
+import { getContracts } from '../api/contracts'
 
 // Master data (migration 0002), not transaction data — no polling, no keepPreviousData.
 // It practically never changes at runtime, so a long staleTime avoids refetching it on
@@ -7,7 +7,7 @@ import { getContractIds } from '../api/contracts'
 export function useContracts() {
   return useQuery({
     queryKey: ['contracts'],
-    queryFn: getContractIds,
+    queryFn: getContracts,
     staleTime: 5 * 60 * 1000,
   })
 }

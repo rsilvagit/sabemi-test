@@ -118,5 +118,10 @@ internal static class PaymentQuerySql
         where id = @Id;
         """;
 
-    public static readonly string ListContractIds = "select contract_id from contract order by contract_id;";
+    // Full contract rows, not just IDs — a client generating synthetic payments (LoadSimulator)
+    // needs installments/total_value too, to post a valor consistent with the contract instead
+    // of a random number that visibly doesn't divide into total_value (e.g. a 6000/12 loan
+    // showing a random R$53.46 "installment" — flagged as a data inconsistency bug).
+    public static readonly string ListContracts =
+        "select contract_id, contract_type, installments, total_value from contract order by contract_id;";
 }

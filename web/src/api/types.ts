@@ -10,6 +10,14 @@ export type ErrorCategory = 'Validation' | 'PaymentFailure' | null
 // not something the webhook payload ever sends. Null when the contract has no seeded entry.
 export type ContractType = 'Emprestimo' | 'Seguro' | null
 
+// GET /api/payments/contracts — the full seeded row, not just the ID (see api/contracts.ts).
+export interface Contract {
+  contractId: string
+  contractType: Exclude<ContractType, null>
+  installments: number | null
+  totalValue: number | null
+}
+
 export interface PaymentListItem {
   id: number
   transactionId: string

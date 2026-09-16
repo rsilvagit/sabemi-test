@@ -65,9 +65,9 @@ export function FiltersBar({
         className="min-w-[180px] rounded-md border border-gray-300 py-1.5 px-3 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500 focus:outline-none"
       >
         <option value="">Todos os contratos</option>
-        {contracts?.map((id) => (
-          <option key={id} value={id}>
-            {id}
+        {contracts?.map((contract) => (
+          <option key={contract.contractId} value={contract.contractId}>
+            {contract.contractId}
           </option>
         ))}
       </select>

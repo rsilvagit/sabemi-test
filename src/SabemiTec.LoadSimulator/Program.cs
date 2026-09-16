@@ -2,6 +2,12 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 
+// The API serializes camelCase (ASP.NET Core Minimal API default); this project's own
+// JsonSerializer.Serialize calls use the Dictionary<string, object?> keys verbatim (already
+// snake_case, the bank's own vocabulary) so this is only needed for reading the API's
+// responses back, not for building outgoing payloads.
+var jsonReadOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
 // Stands in for the partner bank: keeps POSTing synthetic payloads at
 // /webhooks/payment over real HTTP (same auth, same idempotency, same async
 // processing a genuine notification would go through), so the deployed demo shows
@@ -31,12 +37,13 @@ Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
 AppDomain.CurrentDomain.ProcessExit += (_, _) => cts.Cancel();
 
 // Pulled from GET /api/payments/contracts instead of hardcoded, so this never drifts from
-// what is actually seeded (migration 0002) — a hardcoded duplicate list here would silently
-// go stale the moment the seed changes.
-var contractIds = await FetchContractIdsAsync(client, cts.Token);
+// what is actually seeded (migrations 0002/0003) — includes installments/total_value, not
+// just the ID, so BuildPayload can post a valor consistent with the contract instead of an
+// arbitrary number that visibly doesn't divide into it.
+var contracts = await FetchContractsAsync(client, jsonReadOptions, cts.Token);
 
 Console.WriteLine(
-    $"Load simulator started. Target={apiUrl} Interval={intervalSeconds}s ConcurrentRequests={concurrentRequests} Contracts={contractIds.Length}");
+    $"Load simulator started. Target={apiUrl} Interval={intervalSeconds}s ConcurrentRequests={concurrentRequests} Contracts={contracts.Length}");
 
 using var timer = new PeriodicTimer(TimeSpan.FromSeconds(intervalSeconds));
 
@@ -45,7 +52,7 @@ do
     // Fires a burst of concurrent transactions per tick instead of one at a time — closer to
     // how a partner bank actually flushes a batch, and it exercises the idempotency/locking
     // paths (ON CONFLICT, FOR UPDATE SKIP LOCKED) under real concurrency, not just in tests.
-    var sends = Enumerable.Range(0, concurrentRequests).Select(_ => SendOneAsync(client, contractIds, cts.Token));
+    var sends = Enumerable.Range(0, concurrentRequests).Select(_ => SendOneAsync(client, contracts, cts.Token));
     await Task.WhenAll(sends);
 } while (await timer.WaitForNextTickAsync(cts.Token));
 
@@ -53,12 +60,21 @@ return;
 
 // The API container may not be reachable yet on cold start (compose brings services up in
 // parallel), so this retries a handful of times before giving up. If the endpoint is
-// unreachable or returns no contracts (e.g. an older API without migration 0002 applied),
-// falls back to the same fixed list the seed uses today — keeps the worker usable, just
-// without the drift protection.
-static async Task<string[]> FetchContractIdsAsync(HttpClient client, CancellationToken ct)
+// unreachable, falls back to a fixed list matching migrations 0002/0003 exactly — keeps the
+// worker usable and still consistent, just without the drift protection a live fetch gives.
+static async Task<ContractInfo[]> FetchContractsAsync(HttpClient client, JsonSerializerOptions jsonOptions, CancellationToken ct)
 {
-    string[] fallback = ["CT-1001", "CT-1002", "CT-1003", "CT-1004", "CT-1005", "CT-1006", "CT-1007", "CT-1008"];
+    ContractInfo[] fallback =
+    [
+        new("CT-1001", "Emprestimo", 12, 6000.00m),
+        new("CT-1002", "Seguro", null, 1200.00m),
+        new("CT-1003", "Emprestimo", 24, 14400.00m),
+        new("CT-1004", "Seguro", null, 2400.00m),
+        new("CT-1005", "Emprestimo", 6, 3000.00m),
+        new("CT-1006", "Seguro", null, 900.00m),
+        new("CT-1007", "Emprestimo", 36, 21600.00m),
+        new("CT-1008", "Seguro", null, 1800.00m),
+    ];
 
     for (var attempt = 1; attempt <= 5; attempt++)
     {
@@ -67,10 +83,10 @@ static async Task<string[]> FetchContractIdsAsync(HttpClient client, Cancellatio
             var response = await client.GetAsync("/api/payments/contracts", ct);
             if (response.IsSuccessStatusCode)
             {
-                var contractIds = await response.Content.ReadFromJsonAsync<string[]>(cancellationToken: ct);
-                if (contractIds is { Length: > 0 })
+                var contracts = await response.Content.ReadFromJsonAsync<ContractInfo[]>(jsonOptions, ct);
+                if (contracts is { Length: > 0 })
                 {
-                    return contractIds;
+                    return contracts;
                 }
             }
 
@@ -88,9 +104,9 @@ static async Task<string[]> FetchContractIdsAsync(HttpClient client, Cancellatio
     return fallback;
 }
 
-static async Task SendOneAsync(HttpClient client, string[] contractIds, CancellationToken ct)
+static async Task SendOneAsync(HttpClient client, ContractInfo[] contracts, CancellationToken ct)
 {
-    var payload = BuildPayload(contractIds);
+    var payload = BuildPayload(contracts);
     var json = JsonSerializer.Serialize(payload);
 
     try
@@ -118,25 +134,38 @@ static async Task SendOneAsync(HttpClient client, string[] contractIds, Cancella
 // validation-error path (missing id_transacao, unknown status). No negative-value case —
 // this is loan/insurance installment liquidation, not an account debit; the bank has no
 // concept of a "withdrawal" here, so a negative valor was never a realistic payload.
-static Dictionary<string, object?> BuildPayload(string[] contractIds)
+static Dictionary<string, object?> BuildPayload(ContractInfo[] contracts)
 {
     var random = Random.Shared;
-    var contractId = contractIds[random.Next(contractIds.Length)];
+    var contract = contracts[random.Next(contracts.Length)];
     var transactionId = $"TX-SIM-{Guid.NewGuid():N}";
-    var amount = Math.Round(random.NextDouble() * 990 + 10, 2);
+    var amount = InstallmentAmount(contract);
     var paymentDate = DateTime.UtcNow.ToString("O");
 
     return random.NextDouble() switch
     {
-        < 0.65 => Payload(transactionId, contractId, amount, paymentDate, "PAGO"),
-        < 0.85 => Payload(transactionId, contractId, amount, paymentDate, "FALHA"),
-        < 0.95 => PayloadWithoutTransactionId(contractId, amount, paymentDate),
-        _ => Payload(transactionId, contractId, amount, paymentDate, "DESCONHECIDO"),
+        < 0.65 => Payload(transactionId, contract.ContractId, amount, paymentDate, "PAGO"),
+        < 0.85 => Payload(transactionId, contract.ContractId, amount, paymentDate, "FALHA"),
+        < 0.95 => PayloadWithoutTransactionId(contract.ContractId, amount, paymentDate),
+        _ => Payload(transactionId, contract.ContractId, amount, paymentDate, "DESCONHECIDO"),
     };
 }
 
+// Every payment for a given contract has to add up with what the dashboard already shows
+// for it (total_value / installments) — a random valor that doesn't divide into the
+// contract's total looked like a bug (flagged: a 6000/12 loan showing a random R$53.46
+// "installment"). Empréstimo: total_value split evenly across installments. Seguro: no
+// installment plan seeded, so each event is the flat premium (total_value itself).
+static decimal InstallmentAmount(ContractInfo contract) =>
+    contract.TotalValue switch
+    {
+        { } total when contract.Installments is > 0 => Math.Round(total / contract.Installments.Value, 2),
+        { } total => total,
+        null => 100.00m, // no seed data for this contract id — shouldn't happen via the real endpoint
+    };
+
 static Dictionary<string, object?> Payload(
-    string transactionId, string contractId, double amount, string paymentDate, string status) => new()
+    string transactionId, string contractId, decimal amount, string paymentDate, string status) => new()
 {
     ["id_transacao"] = transactionId,
     ["id_contrato"] = contractId,
@@ -146,10 +175,12 @@ static Dictionary<string, object?> Payload(
 };
 
 static Dictionary<string, object?> PayloadWithoutTransactionId(
-    string contractId, double amount, string paymentDate) => new()
+    string contractId, decimal amount, string paymentDate) => new()
 {
     ["id_contrato"] = contractId,
     ["valor"] = amount,
     ["data_pagamento"] = paymentDate,
     ["status"] = "PAGO",
 };
+
+record ContractInfo(string ContractId, string ContractType, int? Installments, decimal? TotalValue);

@@ -101,8 +101,8 @@ public static class DashboardRouteHandler
     {
         uow.Open();
 
-        var contractIds = await repository.ListContractIdsAsync(ct);
-        return Results.Ok(contractIds);
+        var contracts = await repository.ListContractsAsync(ct);
+        return Results.Ok(contracts.Select(c => new ContractDto(c.ContractId, c.ContractType, c.Installments, c.TotalValue)).ToList());
     }
 
     private static async Task<IResult> SearchInvalidAsync(
