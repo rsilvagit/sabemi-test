@@ -2,16 +2,12 @@ using System.Globalization;
 using System.Text.Json;
 using SabemiTec.Api.ACL.PartnerBank.Dto;
 using SabemiTec.Api.ACL.Responses;
+using SabemiTec.Api.Enum;
 
 namespace SabemiTec.Api.ACL.PartnerBank;
 
 public sealed class PartnerBankWebhookAcl : IPaymentWebhookAcl
 {
-    private static readonly HashSet<string> KnownBankStatuses = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "PAGO", "FALHA"
-    };
-
     public PaymentTranslationResult Translate(JsonElement body)
     {
         var rawPayload = body.GetRawText();
@@ -67,7 +63,7 @@ public sealed class PartnerBankWebhookAcl : IPaymentWebhookAcl
             errors.Add(new ValidationFailure("data_pagamento", "Invalid date."));
         }
 
-        var bankStatus = MapStatus(payload.Status);
+        var bankStatus = BankPaymentStatusEnum.TryParse(payload.Status);
         if (string.IsNullOrWhiteSpace(payload.Status))
         {
             errors.Add(new ValidationFailure("status", "Required field."));
@@ -86,7 +82,7 @@ public sealed class PartnerBankWebhookAcl : IPaymentWebhookAcl
                 ContractId = payload.ContractId,
                 Amount = payload.Amount,
                 PaymentDate = paymentDate,
-                BankStatus = bankStatus ?? payload.Status,
+                BankStatus = bankStatus?.Name ?? payload.Status,
                 IsValid = false,
                 Errors = errors
             };
@@ -99,7 +95,7 @@ public sealed class PartnerBankWebhookAcl : IPaymentWebhookAcl
             ContractId = payload.ContractId,
             Amount = payload.Amount,
             PaymentDate = paymentDate,
-            BankStatus = bankStatus,
+            BankStatus = bankStatus?.Name,
             IsValid = true,
             Errors = []
         };
@@ -113,14 +109,6 @@ public sealed class PartnerBankWebhookAcl : IPaymentWebhookAcl
             IsValid = false,
             Errors = errors
         };
-
-    // Vocabulary normalization — the actual anti-corruption part.
-    private static string? MapStatus(string? bankStatus) => bankStatus?.Trim().ToUpperInvariant() switch
-    {
-        "PAGO" => "PAGO",
-        "FALHA" => "FALHA",
-        _ => null
-    };
 
     private static bool TryParseDate(string value, out DateTimeOffset? result)
     {

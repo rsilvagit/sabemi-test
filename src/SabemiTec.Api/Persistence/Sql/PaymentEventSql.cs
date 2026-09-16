@@ -1,3 +1,5 @@
+using SabemiTec.Api.Enum;
+
 namespace SabemiTec.Api.Persistence.Sql;
 
 internal static class PaymentEventSql
@@ -22,14 +24,14 @@ internal static class PaymentEventSql
         """;
 
     // FOR UPDATE SKIP LOCKED: each worker locks what it grabbed; the others skip instead of
-    // blocking. The lease clause (processing_status=1 with an expired locked_at) recovers
+    // blocking. The lease clause (processing_status=Locked with an expired locked_at) recovers
     // items left behind by a crash.
-    public const string ClaimBatch = """
+    public static readonly string ClaimBatch = $"""
         update payment_event e
-        set    processing_status = 1, attempts = e.attempts + 1, locked_at = now()
+        set    processing_status = {ProcessingStatusEnum.Locked.Id}, attempts = e.attempts + 1, locked_at = now()
         from ( select id from payment_event
-                where (processing_status = 0 and available_at <= now())
-                   or (processing_status = 1 and locked_at < now() - @LeaseSeconds * interval '1 second')
+                where (processing_status = {ProcessingStatusEnum.Pending.Id} and available_at <= now())
+                   or (processing_status = {ProcessingStatusEnum.Locked.Id} and locked_at < now() - @LeaseSeconds * interval '1 second')
                 order by available_at, id
                 for update skip locked
                 limit @BatchSize ) as c
@@ -41,15 +43,15 @@ internal static class PaymentEventSql
     // Conditional on the lease: if another worker already reclaimed it (lease expired and
     // claimed elsewhere), affected = 0 and the caller undoes the contract upsert instead of
     // applying it twice.
-    public const string MarkProcessed = """
+    public static readonly string MarkProcessed = $"""
         update payment_event
-        set processing_status = 2, processed_at = now(), last_error = null
-        where id = @Id and processing_status = 1;
+        set processing_status = {ProcessingStatusEnum.Processed.Id}, processed_at = now(), last_error = null
+        where id = @Id and processing_status = {ProcessingStatusEnum.Locked.Id};
         """;
 
-    public const string MarkFailedOrDeadLettered = """
+    public static readonly string MarkFailedOrDeadLettered = $"""
         update payment_event
-        set processing_status = case when attempts >= @MaxAttempts then 3 else 0 end,
+        set processing_status = case when attempts >= @MaxAttempts then {ProcessingStatusEnum.DeadLettered.Id} else {ProcessingStatusEnum.Pending.Id} end,
             available_at = now() + @RetryDelaySeconds * interval '1 second',
             locked_at = null,
             last_error = @Error

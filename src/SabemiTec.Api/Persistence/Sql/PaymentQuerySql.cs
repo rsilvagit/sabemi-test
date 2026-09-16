@@ -1,14 +1,16 @@
+using SabemiTec.Api.Enum;
+
 namespace SabemiTec.Api.Persistence.Sql;
 
 internal static class PaymentQuerySql
 {
     // effective_status resolves the ambiguity between payment_status (the bank's word) and
     // processing_status (ours) into the single filter the dashboard needs — see the plan.
-    private const string EffectiveStatusCase = """
+    private static readonly string EffectiveStatusCase = $"""
         case
-            when not is_valid or processing_status = 3 then 'Error'
-            when processing_status in (0, 1) then 'Pending'
-            when processing_status = 2 and payment_status = 'PAGO' then 'Success'
+            when not is_valid or processing_status = {ProcessingStatusEnum.DeadLettered.Id} then 'Error'
+            when processing_status in ({ProcessingStatusEnum.Pending.Id}, {ProcessingStatusEnum.Locked.Id}) then 'Pending'
+            when processing_status = {ProcessingStatusEnum.Processed.Id} and payment_status = '{BankPaymentStatusEnum.Paid.Name}' then 'Success'
             else 'Error'
         end
         """;

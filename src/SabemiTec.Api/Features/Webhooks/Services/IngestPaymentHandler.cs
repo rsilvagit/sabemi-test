@@ -1,6 +1,7 @@
 using System.Text.Json;
 using SabemiTec.Api.ACL;
 using SabemiTec.Api.ACL.Responses;
+using SabemiTec.Api.Enum;
 using SabemiTec.Api.Features.Webhooks.Repositories;
 
 namespace SabemiTec.Api.Features.Webhooks.Services;
@@ -34,7 +35,7 @@ public sealed class IngestPaymentHandler(IPaymentWebhookAcl acl, IPaymentEventRe
             Payload: translated.RawPayload,
             IsValid: translated.IsValid,
             ValidationError: translated.IsValid ? null : string.Join("; ", translated.Errors.Select(e => $"{e.Field}: {e.Message}")),
-            ProcessingStatus: translated.IsValid ? (short)0 : (short)3);
+            ProcessingStatus: (short)(translated.IsValid ? ProcessingStatusEnum.Pending.Id : ProcessingStatusEnum.DeadLettered.Id));
 
         var insertedId = await repository.InsertIfNotExistsAsync(command, ct);
 

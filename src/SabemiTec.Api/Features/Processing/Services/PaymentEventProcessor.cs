@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Options;
+using SabemiTec.Api.Enum;
 using SabemiTec.Api.Features.Processing.Repositories;
 using SabemiTec.Api.Persistence;
 
@@ -25,7 +26,7 @@ public sealed class PaymentEventProcessor(
         {
             await uow.ExecuteAsync(async innerCt =>
             {
-                var isSuccess = string.Equals(evt.PaymentStatus, "PAGO", StringComparison.OrdinalIgnoreCase);
+                var isSuccess = string.Equals(evt.PaymentStatus, BankPaymentStatusEnum.Paid.Name, StringComparison.OrdinalIgnoreCase);
 
                 if (evt.ContractId is not null)
                 {
