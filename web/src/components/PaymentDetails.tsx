@@ -47,9 +47,15 @@ export function PaymentDetails({ item }: { item: PaymentListItem }) {
             value={item.transactionId.startsWith('MISSING:') ? 'Não informada' : item.transactionId}
           />
           <Field label="Contrato" value={item.contractId ?? 'Não informado'} />
-          <Field label="Tipo de Contrato" value={formatContractType(item.contractType, item.installments)} />
+          <Field
+            label="Tipo de Contrato"
+            value={formatContractType(item.contractType, item.installments, item.installmentNumber)}
+          />
           <Field label="Valor" value={formatCurrency(item.amount)} />
+          <Field label="Valor total do contrato" value={formatCurrency(item.totalValue)} />
           <Field label="Data de pagamento" value={formatDate(item.paymentDate)} />
+          <Field label="Recebido em" value={formatDate(item.receivedAt)} />
+          <Field label="Processado em" value={formatDate(item.processedAt)} />
         </dl>
       </div>
     </div>

@@ -15,6 +15,8 @@ public class PaymentListItem
     public string? ErrorCategory { get; init; }
     public string? ContractType { get; init; }
     public int? Installments { get; init; }
+    public decimal? TotalValue { get; init; }
+    public long? InstallmentNumber { get; init; }
     public int Attempts { get; init; }
     public string? LastError { get; init; }
     public string? ValidationError { get; init; }

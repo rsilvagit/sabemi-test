@@ -12,6 +12,8 @@ public sealed record PaymentDetailDto(
     string? ErrorCategory,
     string? ContractType,
     int? Installments,
+    decimal? TotalValue,
+    long? InstallmentNumber,
     int Attempts,
     string? LastError,
     string? ValidationError,

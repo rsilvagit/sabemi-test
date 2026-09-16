@@ -21,6 +21,8 @@ export interface PaymentListItem {
   errorCategory: ErrorCategory
   contractType: ContractType
   installments: number | null
+  totalValue: number | null
+  installmentNumber: number | null
   attempts: number
   lastError: string | null
   validationError: string | null

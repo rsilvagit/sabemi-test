@@ -21,18 +21,17 @@ export function PaymentRow({ item }: { item: PaymentListItem }) {
         </td>
         <td className="px-4 py-3 text-primary-700">{item.contractId ?? '—'}</td>
         <td className="px-4 py-3 text-gray-600">
-          {formatContractType(item.contractType, item.installments)}
+          {formatContractType(item.contractType, item.installments, item.installmentNumber)}
         </td>
         <td className="px-4 py-3">{formatCurrency(item.amount)}</td>
         <td className="px-4 py-3">
           <StatusBadge status={item.effectiveStatus} errorCategory={item.errorCategory} />
         </td>
         <td className="px-4 py-3 text-gray-500">{formatDate(item.receivedAt)}</td>
-        <td className="px-4 py-3 text-gray-500">{formatDate(item.processedAt)}</td>
       </tr>
       {expanded && (
         <tr>
-          <td colSpan={7} className="p-0">
+          <td colSpan={6} className="p-0">
             <PaymentDetails item={item} />
           </td>
         </tr>

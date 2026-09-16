@@ -30,6 +30,12 @@ internal static class PaymentQuerySql
         end
         """;
 
+    // Which installment this event is, within its own contract: position in the chronological
+    // sequence of events received for that contract_id — demo-only, same spirit as
+    // contract_type/installments (no payload field carries an installment number either).
+    private const string InstallmentNumberWindow =
+        "row_number() over (partition by e.contract_id order by e.received_at)";
+
     // Wrapped as a subquery so `effective_status` becomes a real column the outer WHERE can
     // filter on — Postgres does not let WHERE see a SELECT-list alias (WHERE runs before SELECT).
     // contract_type/installments come from a LEFT JOIN, not the event itself — see migration
@@ -44,7 +50,8 @@ internal static class PaymentQuerySql
                 e.processing_status, e.attempts, e.last_error, e.validation_error, e.received_at, e.processed_at,
                 {EffectiveStatusCase} as effective_status,
                 {ErrorCategoryCase} as error_category,
-                c.contract_type, c.installments
+                c.contract_type, c.installments, c.total_value,
+                {InstallmentNumberWindow} as installment_number
             from payment_event e
             left join contract c on c.contract_id = e.contract_id
         ) events
@@ -61,17 +68,24 @@ internal static class PaymentQuerySql
         from payment_event;
         """;
 
+    // installment_number is a window function over contract_id — it has to see every event
+    // for that contract, not just the one row `id = @Id` would filter down to. WHERE runs
+    // before window functions in SQL's logical order, so filtering by id has to happen in an
+    // outer query wrapping the window instead of alongside it.
     public static readonly string FindById = $"""
-        select
-            e.id, e.contract_id, e.transaction_id, e.amount, e.payment_date, e.payment_status,
-            e.processing_status, e.attempts, e.last_error, e.validation_error, e.received_at, e.processed_at,
-            e.payload,
-            {EffectiveStatusCase} as effective_status,
-            {ErrorCategoryCase} as error_category,
-            c.contract_type, c.installments
-        from payment_event e
-        left join contract c on c.contract_id = e.contract_id
-        where e.id = @Id;
+        select * from (
+            select
+                e.id, e.contract_id, e.transaction_id, e.amount, e.payment_date, e.payment_status,
+                e.processing_status, e.attempts, e.last_error, e.validation_error, e.received_at, e.processed_at,
+                e.payload,
+                {EffectiveStatusCase} as effective_status,
+                {ErrorCategoryCase} as error_category,
+                c.contract_type, c.installments, c.total_value,
+                {InstallmentNumberWindow} as installment_number
+            from payment_event e
+            left join contract c on c.contract_id = e.contract_id
+        ) events
+        where id = @Id;
         """;
 
     public static readonly string ListContractIds = "select contract_id from contract order by contract_id;";

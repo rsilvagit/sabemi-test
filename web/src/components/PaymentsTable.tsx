@@ -38,7 +38,6 @@ export function PaymentsTable({ items, isLoading, isError }: PaymentsTableProps)
             <th className="px-4 py-3">Valor</th>
             <th className="px-4 py-3">Status</th>
             <th className="px-4 py-3">Recebido em</th>
-            <th className="px-4 py-3">Processado em</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
