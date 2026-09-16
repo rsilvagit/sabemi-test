@@ -245,15 +245,20 @@ cada requisito do PDF mora inteiro numa pasta. Descartado deliberadamente:
 Convenção de DI: `Configurations/Extensions/ServicesExtensions.cs` concentra métodos `AddX`
 por área, encadeados fluentemente no `Program.cs` — nenhum `services.AddScoped<>()` solto.
 
-### Erro de validação vs. falha de pagamento — mesmo badge "Erro", rótulo diferente
+### Erro de validação: aba própria, fora da lista principal
 
-O badge "Erro" cobre dois casos bem diferentes: payload malformado (nunca chegou a um
-resultado de negócio) e payload processado com sucesso mas rejeitado pelo banco
-(`payment_status = FALHA`). Um campo derivado, `error_category`
-(`Validation` | `PaymentFailure` | `null`, calculado em SQL junto com `effective_status`),
-faz o dashboard mostrar "Erro de validação" ou "Falha de pagamento" em vez de um "Erro"
-genérico — mesma cor/pill, texto diferente. O filtro Sucesso/Erro/Pendente do topo continua
-exatamente como o PDF pede; a distinção é só visual dentro do badge.
+O badge "Erro" cobria dois casos bem diferentes: payload malformado (nunca chegou a um
+resultado de negócio, `id_transacao`/`id_contrato` podem estar ausentes ou incorretos) e
+payload processado com sucesso mas rejeitado pelo banco (`payment_status = FALHA`, contrato
+e transação confiáveis). Uma primeira versão resolveu isso com um campo derivado
+`error_category` (`Validation` | `PaymentFailure`) rotulando o mesmo badge — mas misturar um
+evento sem referência confiável de contrato numa lista de pagamentos, associado a um
+`contract_id` como se fosse dado real, não fazia sentido. `GET /api/payments` (e os cards de
+stats) agora **excluem** payload inválido (`where is_valid`) inteiramente; ele só aparece
+via `GET /api/payments/invalid`, numa aba separada do dashboard ("Eventos inválidos"), sem
+`LEFT JOIN` com `contract`, sem `effectiveStatus`/`errorCategory` — só os campos brutos e o
+motivo da rejeição. O requisito do PDF ("alerta visual claro" pra erro de validação) continua
+atendido, só não misturado com pagamentos de verdade.
 
 ### Dado de demonstração: tipo de contrato, parcela e valor total
 
