@@ -72,6 +72,11 @@ jobs:
 
   deploy:
     needs: build-and-push
+    # Manual gate: push to main only tests and publishes fresh images (:latest sits ready
+    # in GHCR) — it never redeploys Render on its own. Deploy by running this workflow by
+    # hand (Actions tab → "Build, test and deploy" → Run workflow), after checking the
+    # pushed images are what you want live.
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       # Render redeploys by re-pulling the `:latest` tag from the registry whenever its

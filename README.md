@@ -314,9 +314,12 @@ com `SimulatedDelayMs: 0`.
 ## Deploy (Render + Supabase, via GitHub Actions)
 
 Pipeline: push em `main` → `.github/workflows/deploy.yml` roda a suíte de testes → builda e
-publica as duas imagens Docker no GitHub Container Registry (`ghcr.io`) → dispara o redeploy
-no Render via Deploy Hook. O Render **não** builda a partir do repositório — ele só puxa a
-imagem já pronta, então a etapa de build/teste do CI é o gate real antes de qualquer deploy.
+publica as duas imagens Docker no GitHub Container Registry (`ghcr.io`), com a tag `:latest`
+pronta pra puxar. **O redeploy no Render não acontece sozinho no push** — ele é um gate
+manual: em *Actions → Build, test and deploy → Run workflow* (`workflow_dispatch`), o job
+`deploy` dispara os Deploy Hooks. Push sempre valida e publica a imagem; quem decide subir
+pro ar é você, rodando o workflow manualmente quando quiser. O Render **não** builda a
+partir do repositório — ele só puxa a imagem já publicada.
 
 O que eu não consigo fazer por você (exige login nas suas contas): criar o projeto no
 Supabase, criar os dois serviços no Render, e cadastrar os secrets no GitHub. O passo a
