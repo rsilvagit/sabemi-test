@@ -223,7 +223,7 @@ de uma variável bakeada no bundle JS em build time (`VITE_API_KEY`, ver
 foi um segredo forte (é só um filtro contra scraping casual, já era isso mesmo quando só o
 proxy a conhecia), e a alternativa — desistir da auth no `GET` — seria pior.
 
-### Vertical slice, não Clean Architecture / DDD tático / hexagonal
+### Vertical slice
 
 `Features/<Webhooks|Processing|Dashboard>/` agrupa por caso de uso, não por camada técnica —
 cada serviço esta contido em uma feature. Descartado deliberadamente:
@@ -231,19 +231,6 @@ cada serviço esta contido em uma feature. Descartado deliberadamente:
 Convenção de DI: `Configurations/Extensions/ServicesExtensions.cs` concentra métodos `AddX`
 por área, encadeados fluentemente no `Program.cs` — nenhum `services.AddScoped<>()` solto.
 
-### Dois status, uma ambiguidade resolvida
-
-O enunciado pede filtro "Sucesso/Erro", mas existem dois conceitos de status: o que o banco
-informou (`payment_status`: PAGO/FALHA) e o estado do nosso processamento
-(`processing_status`: Pending/Processing/Processed/Failed/DeadLettered). Resolvido com um
-campo derivado, `effectiveStatus`, calculado em SQL:
-
-| Condição | `effectiveStatus` |
-|---|---|
-| payload inválido ou dead-lettered | `Error` |
-| ainda pendente/processando | `Pending` |
-| processado e `payment_status = PAGO` | `Success` |
-| processado mas `payment_status ≠ PAGO` | `Error` |
 
 ### Frontend: polling
 
