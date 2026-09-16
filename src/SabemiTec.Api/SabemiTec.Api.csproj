@@ -16,7 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="Persistence\Migrations\Scripts\*.sql" />
+    <EmbeddedResource Include="Database\PostgreSQL\Migrations\Scripts\*.sql" />
   </ItemGroup>
 
 </Project>

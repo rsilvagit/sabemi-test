@@ -1,4 +1,4 @@
-using Npgsql;
+using SabemiTec.Api.Database.PostgreSQL;
 using SabemiTec.Api.Features.Dashboard.RouteHandler;
 using SabemiTec.Api.Features.Webhooks.RouteHandler;
 
@@ -8,9 +8,9 @@ public static class EndpointExtensions
 {
     public static IEndpointRouteBuilder ConfigureMapsApp(this WebApplication app)
     {
-        app.MapGet("/health", async (NpgsqlDataSource dataSource, CancellationToken ct) =>
+        app.MapGet("/health", (IUnitOfWork uow) =>
         {
-            await using var conn = await dataSource.OpenConnectionAsync(ct);
+            uow.Open();
             return Results.Ok(new { status = "ok" });
         });
 

@@ -1,12 +1,12 @@
 using Dapper;
-using Npgsql;
-using SabemiTec.Api.Persistence.Sql;
+using SabemiTec.Api.Database.PostgreSQL;
+using SabemiTec.Api.Database.PostgreSQL.Sql;
 
 namespace SabemiTec.Api.Features.Dashboard.Repositories;
 
-/// <summary>Read-only — no IUnitOfWork here on purpose: opening a transaction for a SELECT
-/// would just be noise. Connects directly through the NpgsqlDataSource.</summary>
-internal sealed class PaymentQueryRepository(NpgsqlDataSource dataSource) : IPaymentQueryRepository
+/// <summary>Read-only — no transaction here on purpose, just the shared request connection
+/// opened by the route handler via IUnitOfWork.Open().</summary>
+internal sealed class PaymentQueryRepository(IDatabaseConnection db) : IPaymentQueryRepository
 {
     public async Task<(IReadOnlyList<PaymentListItem> Items, bool HasMore)> SearchAsync(PaymentQuery query, CancellationToken ct)
     {
@@ -39,9 +39,8 @@ internal sealed class PaymentQueryRepository(NpgsqlDataSource dataSource) : IPay
             + (predicates.Count > 0 ? " where " + string.Join(" and ", predicates) : "")
             + " order by received_at desc, id desc limit @Limit offset @Offset;";
 
-        await using var conn = await dataSource.OpenConnectionAsync(ct);
         var cmd = new CommandDefinition(sql, parameters, cancellationToken: ct);
-        var rows = (await conn.QueryAsync<PaymentListItem>(cmd)).AsList();
+        var rows = (await db.Connection.QueryAsync<PaymentListItem>(cmd)).AsList();
 
         var hasMore = rows.Count > pageSize;
         if (hasMore)
@@ -54,15 +53,13 @@ internal sealed class PaymentQueryRepository(NpgsqlDataSource dataSource) : IPay
 
     public async Task<PaymentDetail?> FindByIdAsync(long id, CancellationToken ct)
     {
-        await using var conn = await dataSource.OpenConnectionAsync(ct);
         var cmd = new CommandDefinition(PaymentQuerySql.FindById, new { Id = id }, cancellationToken: ct);
-        return await conn.QuerySingleOrDefaultAsync<PaymentDetail>(cmd);
+        return await db.Connection.QuerySingleOrDefaultAsync<PaymentDetail>(cmd);
     }
 
     public async Task<PaymentStats> GetStatsAsync(CancellationToken ct)
     {
-        await using var conn = await dataSource.OpenConnectionAsync(ct);
         var cmd = new CommandDefinition(PaymentQuerySql.Stats, cancellationToken: ct);
-        return await conn.QuerySingleAsync<PaymentStats>(cmd);
+        return await db.Connection.QuerySingleAsync<PaymentStats>(cmd);
     }
 }

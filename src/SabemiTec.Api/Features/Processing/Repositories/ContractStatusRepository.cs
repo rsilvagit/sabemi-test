@@ -1,16 +1,15 @@
 using Dapper;
-using SabemiTec.Api.Persistence;
-using SabemiTec.Api.Persistence.Sql;
+using SabemiTec.Api.Database.PostgreSQL;
+using SabemiTec.Api.Database.PostgreSQL.Sql;
 
 namespace SabemiTec.Api.Features.Processing.Repositories;
 
 /// <summary>Always runs inside the current IUnitOfWork transaction — never standalone.</summary>
-internal sealed class ContractStatusRepository(IUnitOfWork uow) : IContractStatusRepository
+internal sealed class ContractStatusRepository(IDatabaseConnection db) : IContractStatusRepository
 {
     public async Task UpsertAsync(UpsertContractStatusCommand command, CancellationToken ct)
     {
-        var connection = await uow.EnsureOpenAsync(ct);
-        var cmd = new CommandDefinition(ContractStatusSql.Upsert, command, uow.Transaction, cancellationToken: ct);
-        await connection.ExecuteAsync(cmd);
+        var cmd = new CommandDefinition(ContractStatusSql.Upsert, command, db.Transaction, cancellationToken: ct);
+        await db.Connection.ExecuteAsync(cmd);
     }
 }

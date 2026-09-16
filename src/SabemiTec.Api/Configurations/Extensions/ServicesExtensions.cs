@@ -1,13 +1,12 @@
-using Npgsql;
 using SabemiTec.Api.ACL;
 using SabemiTec.Api.ACL.PartnerBank;
+using SabemiTec.Api.Database.PostgreSQL;
 using SabemiTec.Api.Features.Dashboard.Repositories;
 using SabemiTec.Api.Features.Processing;
 using SabemiTec.Api.Features.Processing.Repositories;
 using SabemiTec.Api.Features.Processing.Services;
 using SabemiTec.Api.Features.Webhooks.Repositories;
 using SabemiTec.Api.Features.Webhooks.Services;
-using SabemiTec.Api.Persistence;
 using SabemiTec.Api.Security;
 
 namespace SabemiTec.Api.Configurations.Extensions;
@@ -18,21 +17,15 @@ namespace SabemiTec.Api.Configurations.Extensions;
 /// </summary>
 public static class ServicesExtensions
 {
-    public static IServiceCollection AddPersistence(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddDatabase(this IServiceCollection services)
     {
-        // Lazy resolution: reads IConfiguration from the final IServiceProvider, at the
-        // moment the singleton is created — not from builder.Configuration at registration
-        // time. WebApplicationFactory injects its config overrides during Build(), which
-        // happens AFTER this method runs; capturing the connection string here instead of
-        // reading it from the IServiceProvider would make integration tests connect to the
-        // wrong string.
-        services.AddSingleton(sp =>
-        {
-            var connectionString = sp.GetRequiredService<IConfiguration>().GetConnectionString("Default")
-                ?? throw new InvalidOperationException("ConnectionStrings:Default is not configured.");
-            return NpgsqlDataSource.Create(connectionString);
-        });
-        services.AddScoped<IUnitOfWork, NpgsqlUnitOfWork>();
+        // Scoped, not singleton: IConfiguration is resolved from the request scope's
+        // IServiceProvider at the moment each instance is created — same reasoning as the
+        // core.flashcard-master DatabaseConnection classes. WebApplicationFactory applies its
+        // config overrides during Build(), which happens before any scope is created, so this
+        // is naturally safe for integration tests too.
+        services.AddScoped<IDatabaseConnection, DatabaseConnection>();
+        services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         return services;
     }

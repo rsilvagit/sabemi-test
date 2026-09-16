@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
-using SabemiTec.Api.Persistence;
-using SabemiTec.Api.Persistence.Migrations;
+using SabemiTec.Api.Database.PostgreSQL;
+using SabemiTec.Api.Database.PostgreSQL.Migrations;
 using Testcontainers.PostgreSql;
 using Xunit;
 

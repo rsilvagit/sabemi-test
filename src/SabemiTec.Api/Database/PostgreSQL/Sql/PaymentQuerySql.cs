@@ -1,6 +1,6 @@
 using SabemiTec.Api.Enum;
 
-namespace SabemiTec.Api.Persistence.Sql;
+namespace SabemiTec.Api.Database.PostgreSQL.Sql;
 
 internal static class PaymentQuerySql
 {

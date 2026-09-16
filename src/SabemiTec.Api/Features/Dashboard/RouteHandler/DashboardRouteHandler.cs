@@ -1,3 +1,4 @@
+using SabemiTec.Api.Database.PostgreSQL;
 using SabemiTec.Api.Features.Dashboard.DTO;
 using SabemiTec.Api.Features.Dashboard.Repositories;
 
@@ -30,12 +31,15 @@ public static class DashboardRouteHandler
 
     private static async Task<IResult> SearchAsync(
         IPaymentQueryRepository repository,
+        IUnitOfWork uow,
         CancellationToken ct,
         string? status = null,
         string? contractId = null,
         int page = 1,
         int pageSize = 25)
     {
+        uow.Open();
+
         var query = new PaymentQuery(status, contractId, page <= 0 ? 1 : page, pageSize <= 0 ? 25 : pageSize);
         var (items, hasMore) = await repository.SearchAsync(query, ct);
 
@@ -46,14 +50,18 @@ public static class DashboardRouteHandler
             hasMore));
     }
 
-    private static async Task<IResult> GetByIdAsync(long id, IPaymentQueryRepository repository, CancellationToken ct)
+    private static async Task<IResult> GetByIdAsync(long id, IPaymentQueryRepository repository, IUnitOfWork uow, CancellationToken ct)
     {
+        uow.Open();
+
         var detail = await repository.FindByIdAsync(id, ct);
         return detail is null ? Results.NotFound() : Results.Ok(ToDetailDto(detail));
     }
 
-    private static async Task<IResult> GetStatsAsync(IPaymentQueryRepository repository, CancellationToken ct)
+    private static async Task<IResult> GetStatsAsync(IPaymentQueryRepository repository, IUnitOfWork uow, CancellationToken ct)
     {
+        uow.Open();
+
         var stats = await repository.GetStatsAsync(ct);
         return Results.Ok(new PaymentStatsDto(stats.Total, stats.Success, stats.Error, stats.Pending));
     }

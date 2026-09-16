@@ -2,7 +2,7 @@ using System.Reflection;
 using DbUp;
 using Npgsql;
 
-namespace SabemiTec.Api.Persistence.Migrations;
+namespace SabemiTec.Api.Database.PostgreSQL.Migrations;
 
 /// <summary>
 /// Applies the schema with DbUp on startup. Compose brings up a single API instance,

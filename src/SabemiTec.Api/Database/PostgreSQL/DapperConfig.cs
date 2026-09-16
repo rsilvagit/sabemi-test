@@ -1,4 +1,4 @@
-namespace SabemiTec.Api.Persistence;
+namespace SabemiTec.Api.Database.PostgreSQL;
 
 /// <summary>
 /// Called once by Program.cs and by the integration test fixture.

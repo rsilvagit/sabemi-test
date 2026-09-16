@@ -1,7 +1,7 @@
 using SabemiTec.Api.Configurations.Extensions;
-using SabemiTec.Api.Persistence;
-using SabemiTec.Api.Persistence.Migrations;
-using SabemiTec.Api.Security.RateLimiting;
+using SabemiTec.Api.Database.PostgreSQL;
+using SabemiTec.Api.Database.PostgreSQL.Migrations;
+using SabemiTec.Api.Configurations.RateLimiting;
 
 DapperConfig.Configure();
 
@@ -10,7 +10,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services
     .AddEndpointsApiExplorer()
     .AddSwaggerGen()
-    .AddPersistence(builder.Configuration)
+    .AddDatabase()
     .AddAcl()
     .AddWebhookFeature()
     .AddProcessingFeature(builder.Configuration)
