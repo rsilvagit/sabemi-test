@@ -76,5 +76,10 @@ public static class ServicesExtensions
         return services;
     }
 
-    public const string DashboardCorsPolicy = "dashboard";
+    // Same policy name core.flashcard-master uses (AddCorsPolicy/"AllowSpecificOrigins") —
+    // origins stay config-driven here (Cors:DashboardOrigins) instead of hardcoded per
+    // environment, matching how the rest of this project configures things (RateLimiting,
+    // Webhook:ApiKey), and the policy itself stays narrower (GET + X-Api-Key only, no
+    // AllowAnyHeader/AllowAnyMethod/AllowCredentials) since that's all the dashboard needs.
+    public const string DashboardCorsPolicy = "AllowSpecificOrigins";
 }
