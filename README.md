@@ -36,8 +36,9 @@ depois — é o processamento assíncrono em ação.
 
 Pra ver o dashboard [em produção](https://sabemi-web.onrender.com) se movendo sozinho em vez
 de gerar eventos manualmente, rode localmente o worker `load-simulator` — ele faz o papel do
-banco parceiro, chamando `POST /webhooks/payment` de verdade a cada poucos segundos, com uma
-mistura de pagamentos válidos e payloads inválidos, contra a API de staging no Render:
+banco parceiro, disparando um **lote de transações concorrentes** (`CONCURRENT_REQUESTS`, 5
+por padrão) a cada 25s contra `POST /webhooks/payment`, com uma mistura de pagamentos
+válidos e payloads inválidos, contra a API de staging no Render:
 
 ```bash
 STG_WEBHOOK_API_KEY=<chave real do Webhook__ApiKey do sabemi-api> \
@@ -47,7 +48,9 @@ STG_WEBHOOK_API_KEY=<chave real do Webhook__ApiKey do sabemi-api> \
 Roda no seu próprio computador, não precisa de um serviço pago rodando 24/7 no Render — só
 liga quando você quiser demonstrar o sistema com dados em movimento, e desliga com `docker
 compose --profile simulator down` quando terminar. Pra mirar na API local em vez da de
-staging, defina `LOAD_SIMULATOR_API_URL=http://api:8080` também.
+staging, defina `LOAD_SIMULATOR_API_URL=http://api:8080` também; pra ajustar o intervalo
+entre lotes, `LOAD_SIMULATOR_INTERVAL_SECONDS=<n>`; pra ajustar quantas transações
+simultâneas por lote, `LOAD_SIMULATOR_CONCURRENCY=<n>`.
 
 É opt-in (`--profile simulator`) porque não é parte do requisito — só ajuda a demonstrar o
 sistema. Um `docker compose up` normal não sobe esse worker.

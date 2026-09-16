@@ -16,10 +16,14 @@ if (string.IsNullOrEmpty(apiKey))
 var intervalSeconds = int.TryParse(Environment.GetEnvironmentVariable("INTERVAL_SECONDS"), out var parsed)
     ? parsed
     : 5;
+var concurrentRequests = int.TryParse(Environment.GetEnvironmentVariable("CONCURRENT_REQUESTS"), out var concurrency)
+    ? Math.Max(1, concurrency)
+    : 5;
 
 var contractIds = new[] { "CT-1001", "CT-1002", "CT-1003", "CT-1004", "CT-1005", "CT-1006", "CT-1007", "CT-1008" };
-var random = new Random();
 
+// A single HttpClient is thread-safe for concurrent requests by design; Random.Shared (not
+// `new Random()`) is what makes BuildPayload safe to call from multiple tasks at once.
 using var client = new HttpClient { BaseAddress = new Uri(apiUrl) };
 client.DefaultRequestHeaders.Add("X-Api-Key", apiKey);
 
@@ -27,47 +31,53 @@ using var cts = new CancellationTokenSource();
 Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
 AppDomain.CurrentDomain.ProcessExit += (_, _) => cts.Cancel();
 
-Console.WriteLine($"Load simulator started. Target={apiUrl} Interval={intervalSeconds}s");
+Console.WriteLine(
+    $"Load simulator started. Target={apiUrl} Interval={intervalSeconds}s ConcurrentRequests={concurrentRequests}");
 
 using var timer = new PeriodicTimer(TimeSpan.FromSeconds(intervalSeconds));
 
 do
 {
-    try
-    {
-        await SendOneAsync(client, contractIds, random, cts.Token);
-    }
-    catch (OperationCanceledException) when (cts.IsCancellationRequested)
-    {
-        break;
-    }
-    catch (Exception ex)
-    {
-        // Keep the loop alive across transient failures (cold start, network blip)
-        // instead of letting one bad request kill the process.
-        Console.WriteLine($"[{DateTime.UtcNow:O}] erro ao enviar: {ex.Message}");
-    }
+    // Fires a burst of concurrent transactions per tick instead of one at a time — closer to
+    // how a partner bank actually flushes a batch, and it exercises the idempotency/locking
+    // paths (ON CONFLICT, FOR UPDATE SKIP LOCKED) under real concurrency, not just in tests.
+    var sends = Enumerable.Range(0, concurrentRequests).Select(_ => SendOneAsync(client, contractIds, cts.Token));
+    await Task.WhenAll(sends);
 } while (await timer.WaitForNextTickAsync(cts.Token));
 
 return;
 
-static async Task SendOneAsync(HttpClient client, string[] contractIds, Random random, CancellationToken ct)
+static async Task SendOneAsync(HttpClient client, string[] contractIds, CancellationToken ct)
 {
-    var payload = BuildPayload(contractIds, random);
+    var payload = BuildPayload(contractIds);
     var json = JsonSerializer.Serialize(payload);
 
-    using var content = new StringContent(json, Encoding.UTF8, "application/json");
-    using var response = await client.PostAsync("/webhooks/payment", content, ct);
+    try
+    {
+        using var content = new StringContent(json, Encoding.UTF8, "application/json");
+        using var response = await client.PostAsync("/webhooks/payment", content, ct);
 
-    Console.WriteLine(
-        $"[{DateTime.UtcNow:O}] {payload.GetValueOrDefault("id_transacao") ?? "(sem id_transacao)"} -> HTTP {(int)response.StatusCode}");
+        Console.WriteLine(
+            $"[{DateTime.UtcNow:O}] {payload.GetValueOrDefault("id_transacao") ?? "(sem id_transacao)"} -> HTTP {(int)response.StatusCode}");
+    }
+    catch (OperationCanceledException) when (ct.IsCancellationRequested)
+    {
+        // shutting down, nothing to report
+    }
+    catch (Exception ex)
+    {
+        // Keep the loop alive across transient failures (cold start, network blip) instead of
+        // one bad request in the burst taking down the whole batch via Task.WhenAll.
+        Console.WriteLine($"[{DateTime.UtcNow:O}] erro ao enviar: {ex.Message}");
+    }
 }
 
 // Weighted so the dashboard keeps showing a realistic mix of outcomes: mostly paid,
 // some bank-side failures, and a slice of malformed payloads that exercise the
 // validation-error path (missing id_transacao, negative value, unknown status).
-static Dictionary<string, object?> BuildPayload(string[] contractIds, Random random)
+static Dictionary<string, object?> BuildPayload(string[] contractIds)
 {
+    var random = Random.Shared;
     var contractId = contractIds[random.Next(contractIds.Length)];
     var transactionId = $"TX-SIM-{Guid.NewGuid():N}";
     var amount = Math.Round(random.NextDouble() * 990 + 10, 2);

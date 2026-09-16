@@ -57,7 +57,8 @@ services:
       # `docker compose up` (no --profile simulator) too. Left empty, the container itself
       # (only started when the profile is active) fails fast with a clear message instead.
       WEBHOOK_API_KEY: ${STG_WEBHOOK_API_KEY:-}
-      INTERVAL_SECONDS: "5"
+      INTERVAL_SECONDS: ${LOAD_SIMULATOR_INTERVAL_SECONDS:-25}
+      CONCURRENT_REQUESTS: ${LOAD_SIMULATOR_CONCURRENCY:-5}
 
 volumes:
   pgdata:
