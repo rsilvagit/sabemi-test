@@ -17,7 +17,6 @@ export function PaymentRow({ item }: { item: PaymentListItem }) {
         }`}
       >
         <td className="px-4 py-3 font-mono text-xs text-gray-600">{item.transactionId}</td>
-        <td className="px-4 py-3 text-gray-600">{item.paymentStatus ?? '—'}</td>
         <td className="px-4 py-3 text-primary-700">{item.contractId ?? '—'}</td>
         <td className="px-4 py-3">{formatCurrency(item.amount)}</td>
         <td className="px-4 py-3">
@@ -28,7 +27,7 @@ export function PaymentRow({ item }: { item: PaymentListItem }) {
       </tr>
       {expanded && isError && (
         <tr>
-          <td colSpan={7} className="p-0">
+          <td colSpan={6} className="p-0">
             <ErrorDetails item={item} />
           </td>
         </tr>
