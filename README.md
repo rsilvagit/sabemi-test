@@ -183,15 +183,36 @@ req/min por IP): o padrão de tráfego é outro — polling humano de uma aba de
 rajada de parceiro — e partitionar por ApiKey não faria sentido aqui, já que todo cliente do
 dashboard compartilha a mesma chave (ver seção de autenticação abaixo).
 
-### O dashboard também exige ApiKey — via proxy, não no bundle JS
+### O dashboard também exige ApiKey — local via proxy, no Render via CORS
 
 `GET /api/payments` é dado de pagamento; publicado sem auth, qualquer um na internet lê
 tudo. A `ApiKeyAuthMiddleware` (a mesma do webhook) passou a proteger os dois grupos de
-rota. A diferença é *onde* a chave é conhecida: o browser nunca a vê. O nginx do serviço
-`web` injeta o header `X-Api-Key` em toda requisição proxied para `/api/` (variável
-`WEBHOOK_API_KEY`, substituída em runtime pelo mesmo mecanismo de `envsubst` que já resolve
-`API_ORIGIN` — não é bakeada em `npm run build`, senão trocar a chave exigiria rebuildar a
-imagem). Fora do Docker, `vite.config.ts` faz o mesmo na configuração do proxy de dev.
+rota. Localmente (docker-compose, `npm run dev`) o browser nunca vê a chave: o nginx do
+serviço `web` (ou o proxy de dev do Vite) injeta o header `X-Api-Key` em toda requisição
+proxied para `/api/`, lida em runtime via `envsubst`/`vite.config.ts`.
+
+No Render isso não é possível — ver a seção de arquitetura de deploy logo abaixo, que
+explica por que o proxy nginx→API não funciona lá — então o browser chama a API
+diretamente (`https://sabemi-api.onrender.com`, CORS liberado só para `GET` em
+`/api/payments*` e só para a origem do `sabemi-web`) e manda a `X-Api-Key` ele mesmo, lida
+de uma variável bakeada no bundle JS em build time (`VITE_API_KEY`, ver
+`.github/workflows/deploy.yml`). Isso não é uma regressão de segurança real: a chave nunca
+foi um segredo forte (é só um filtro contra scraping casual, já era isso mesmo quando só o
+proxy a conhecia), e a alternativa — desistir da auth no `GET` — seria pior.
+
+### Deploy no Render: por que o dashboard chama a API direto, não via proxy nginx
+
+O plano original era o nginx do `sabemi-web` proxyar `/api` até o `sabemi-api` (mesmo
+mecanismo do docker-compose, evitando CORS). No Render isso **não funcionou**: a conexão
+HTTPS de um serviço para o outro falha com `SSL_do_handshake() failed ... alert handshake
+failure` contra o próprio edge do Render, independente de DNS por request + SNI corretos
+(`proxy_ssl_server_name`). A rede privada entre serviços (`http://sabemi-api:10000`) também
+não resolveu (`host not found in upstream`) no plano Free testado. Diante disso, o
+`sabemi-web` chama a API pelo endereço público diretamente do browser (CORS), e o nginx
+local continua fazendo proxy normalmente — só a build do Render é diferente (`VITE_API_ORIGIN`
+setado no CI). Documentado aqui para não repetir a investigação se alguém tentar voltar pro
+proxy: pode valer a pena revisitar com um plano pago do Render (rede privada costuma exigir
+isso) ou abrindo um ticket de suporte perguntando o hostname interno correto.
 
 O ponto que mais importa: **o 429 acontece antes de qualquer persistência**, então o reenvio
 que ele provoca cai no mesmo caminho idempotente de sempre — nunca há "throttle por
@@ -330,27 +351,22 @@ quem builda é o GitHub Actions):
   | `ConnectionStrings__Default` | a connection string do Supabase (passo 1.3) |
   | `Webhook__ApiKey` | uma chave real, gerada por você — **não** `dev-local-key` |
   | `Processing__SimulatedDelayMs` | `2000` (opcional, é o default) |
+  | `Cors__DashboardOrigins__0` | a URL pública do `sabemi-web` (ex.: `https://sabemi-web.onrender.com`) |
 - `PORT` **não precisa ser configurado** — o Render injeta automaticamente e o Dockerfile já
   lê `$PORT` (ver `src/SabemiTec.Api/Dockerfile`).
-- Depois de criado, copie a URL pública (ex.: `https://sabemi-api.onrender.com`) — o próximo
-  serviço depende dela.
+- Depois de criado, copie a URL pública (ex.: `https://sabemi-api.onrender.com`) — o passo do
+  secret `WEBHOOK_API_KEY` abaixo e o `sabemi-web` dependem dela.
 
 **`sabemi-web`**
 - Imagem: `ghcr.io/<seu-usuario>/<repo>-web:latest`
-- Variáveis de ambiente:
-  | Nome | Valor |
-  |---|---|
-  | `API_ORIGIN` | o endereço **interno** do `sabemi-api` na rede privada do Render (ex.: `http://sabemi-api:10000` — ver *Connect* na página do serviço) |
-  | `WEBHOOK_API_KEY` | a **mesma** chave configurada em `Webhook__ApiKey` no `sabemi-api` |
-- O nginx dentro da imagem usa `API_ORIGIN` para fazer proxy de `/api` e `/webhooks` até a
-  API — o mesmo mecanismo que evita CORS localmente (`web/nginx.conf.template`) — e injeta
-  `WEBHOOK_API_KEY` como header `X-Api-Key` em toda chamada a `/api`, autenticando o
-  dashboard sem expor a chave no bundle JS. **`API_ORIGIN` precisa ser o endereço interno,
-  não a URL pública**: proxyar de dentro do nginx para a URL pública do `sabemi-api`
-  significa reatravessar o edge com TLS por hostname do próprio Render, que rejeitou a
-  conexão com "SSL alert handshake failure" nos testes — a rede privada evita esse hop
-  público inteiro (mais rápido e sem esse problema). Os dois serviços precisam estar na
-  mesma região (Ohio, no nosso caso) para a rede privada funcionar.
+- Não precisa de variáveis de ambiente específicas — `API_ORIGIN`/`WEBHOOK_API_KEY` ficam nos
+  defaults do Dockerfile (não são usados de verdade em produção, ver abaixo).
+- **Antes de dar push**: cadastre o secret `WEBHOOK_API_KEY` no GitHub (mesmo valor do
+  `Webhook__ApiKey` do `sabemi-api`) — o CI passa ele como build-arg pro `npm run build` do
+  `sabemi-web`, bakeando no bundle JS. Sem isso a imagem builda com uma chave vazia e o
+  dashboard não autentica. Ver por quê na seção "Deploy no Render" acima: o nginx do
+  `sabemi-web` não consegue proxyar pro `sabemi-api` lá, então o browser chama a API
+  diretamente e manda a chave ele mesmo.
 
 Em ambos os serviços, pegue a **Deploy Hook URL** em *Settings → Deploy Hook* — é o que o
 GitHub Actions vai chamar a cada push.
@@ -368,6 +384,7 @@ Em *Settings → Secrets and variables → Actions* do repositório:
 |---|---|
 | `RENDER_DEPLOY_HOOK_API` | Deploy Hook do serviço `sabemi-api` |
 | `RENDER_DEPLOY_HOOK_WEB` | Deploy Hook do serviço `sabemi-web` |
+| `WEBHOOK_API_KEY` | a mesma chave real usada em `Webhook__ApiKey` no `sabemi-api` — bakeada no bundle do `sabemi-web` em build time |
 
 `GITHUB_TOKEN` (usado para publicar no GHCR) já existe automaticamente em todo repositório —
 não precisa criar.

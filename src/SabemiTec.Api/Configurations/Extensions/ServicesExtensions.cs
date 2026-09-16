@@ -55,10 +55,26 @@ public static class ServicesExtensions
         return services;
     }
 
-    public static IServiceCollection AddDashboardFeature(this IServiceCollection services)
+    public static IServiceCollection AddDashboardFeature(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddScoped<IPaymentQueryRepository, PaymentQueryRepository>();
 
+        // Cross-origin only where it has to be: on Render, nginx proxying /api to the API
+        // service hits a TLS handshake failure against Render's own edge, so the dashboard
+        // calls the API's public URL directly instead of same-origin through a proxy — see
+        // web/src/api/client.ts. Locally (Vite dev, docker-compose) this policy is unused,
+        // since same-origin requests never trigger CORS.
+        var dashboardOrigins = configuration.GetSection("Cors:DashboardOrigins").Get<string[]>() ?? [];
+        services.AddCors(options =>
+        {
+            options.AddPolicy(DashboardCorsPolicy, policy =>
+                policy.WithOrigins(dashboardOrigins)
+                    .WithMethods("GET")
+                    .WithHeaders("X-Api-Key"));
+        });
+
         return services;
     }
+
+    public const string DashboardCorsPolicy = "dashboard";
 }

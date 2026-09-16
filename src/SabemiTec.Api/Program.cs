@@ -15,7 +15,7 @@ builder.Services
     .AddAcl()
     .AddWebhookFeature()
     .AddProcessingFeature(builder.Configuration)
-    .AddDashboardFeature()
+    .AddDashboardFeature(builder.Configuration)
     .AddRateLimiting(builder.Configuration);
 
 var app = builder.Build();
@@ -33,6 +33,10 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+// Before UseApiKeyAuth: CORS preflight (OPTIONS) requests never carry X-Api-Key, so the
+// auth middleware would reject them before the browser gets to see the real response.
+app.UseCors();
 
 app.UseApiKeyAuth();
 

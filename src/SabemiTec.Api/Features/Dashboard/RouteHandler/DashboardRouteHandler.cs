@@ -1,3 +1,4 @@
+using SabemiTec.Api.Configurations.Extensions;
 using SabemiTec.Api.Configurations.RateLimiting;
 using SabemiTec.Api.Database.PostgreSQL;
 using SabemiTec.Api.Features.Dashboard.DTO;
@@ -11,6 +12,7 @@ public static class DashboardRouteHandler
     {
         var group = app.MapGroup("/api/payments")
             .RequireRateLimiting(RateLimitingSetup.DashboardPolicy)
+            .RequireCors(ServicesExtensions.DashboardCorsPolicy)
             .WithTags("Dashboard");
 
         group.MapGet("/", SearchAsync)
