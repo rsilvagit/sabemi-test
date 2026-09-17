@@ -42,13 +42,16 @@ banco parceiro, disparando um **lote de transações concorrentes** (`CONCURRENT
 por padrão) a cada 25s contra `POST /webhooks/payment`, contra a API de staging no Render.
 Busca a lista de contratos reais em `GET /api/payments/contracts` no startup (com retry, já
 que a API pode não estar pronta ainda) em vez de hardcoded, pra nunca divergir do que está
-seedado. Mistura payloads válidos (`PAGO`/`FALHA`) e inválidos — `id_transacao` ausente,
-`status` desconhecido — pra exercitar o caminho de erro de validação. Sem cenário de valor
-negativo: é um dashboard de liquidação de parcela, não de movimentação de conta, então não
-existe "saque" nesse domínio.
+seedado — essa rota é do dashboard, então precisa de `STG_DASHBOARD_API_KEY` (opcional: sem
+ela, ou se a chave estiver errada, cai direto na lista fixa de contratos, o worker continua
+funcionando normalmente). Mistura payloads válidos (`PAGO`/`FALHA`) e inválidos —
+`id_transacao` ausente, `status` desconhecido — pra exercitar o caminho de erro de validação.
+Sem cenário de valor negativo: é um dashboard de liquidação de parcela, não de movimentação
+de conta, então não existe "saque" nesse domínio.
 
 ```bash
 STG_WEBHOOK_API_KEY=<chave real do Webhook__ApiKey do sabemi-api, não a do dashboard> \
+STG_DASHBOARD_API_KEY=<chave real do Dashboard__ApiKey do sabemi-api, opcional> \
   docker compose --profile simulator up -d --build
 ```
 
