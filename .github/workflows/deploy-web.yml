@@ -33,9 +33,11 @@ jobs:
       # VITE_API_ORIGIN/VITE_API_KEY are baked into the JS bundle at build time (Vite has no
       # runtime env mechanism) so the dashboard on Render can call the API's public URL
       # directly instead of through nginx — see web/src/api/client.ts for why. The API URL
-      # itself isn't a secret (it's the public sabemi-api hostname); WEBHOOK_API_KEY is
+      # itself isn't a secret (it's the public sabemi-api hostname); DASHBOARD_API_KEY is
       # only gate-level, not a real credential boundary, same reasoning as it already being
-      # injected server-side by nginx for the proxied (local/docker-compose) case.
+      # injected server-side by nginx for the proxied (local/docker-compose) case. It's a
+      # different value from the partner bank's Webhook__ApiKey on purpose — this one ends
+      # up in a public JS bundle, that one never should.
       - name: Build and push web image
         uses: docker/build-push-action@v6
         with:
@@ -44,7 +46,7 @@ jobs:
           tags: ${{ env.REGISTRY }}/${{ steps.image-name.outputs.owner }}-web:latest
           build-args: |
             VITE_API_ORIGIN=https://sabemi-api.onrender.com
-            VITE_API_KEY=${{ secrets.WEBHOOK_API_KEY }}
+            VITE_API_KEY=${{ secrets.DASHBOARD_API_KEY }}
 
       # Render redeploys by re-pulling the `:latest` tag from the registry whenever its
       # Deploy Hook URL receives a POST.

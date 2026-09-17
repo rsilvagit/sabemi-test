@@ -1,4 +1,5 @@
 using System.Text.Json;
+using SabemiTec.Api.ACL.PartnerBank.DTO;
 using SabemiTec.Api.Configurations.RateLimiting;
 using SabemiTec.Api.Features.Webhooks.DTO;
 using SabemiTec.Api.Features.Webhooks.Services;
@@ -15,6 +16,10 @@ public static class PaymentWebhookRouteHandler
 
         group.MapPost("/payment", PostPaymentAsync)
             .WithName("PostPayment")
+            // Documentation only: the handler still reads the raw JsonElement body itself
+            // (see below) so the ACL keeps owning the only place that knows the partner
+            // bank's field names — this just gives Swagger a schema to show.
+            .Accepts<PaymentWebhookPayload>("application/json")
             .Produces(StatusCodes.Status202Accepted)
             .Produces(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)

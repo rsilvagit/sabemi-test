@@ -9,6 +9,8 @@
   <ItemGroup>
     <PackageReference Include="Dapper" Version="2.1.86" />
     <PackageReference Include="dbup-postgresql" Version="7.0.1" />
+    <PackageReference Include="FluentValidation" Version="11.11.0" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.11.0" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.18" />
     <PackageReference Include="Npgsql" Version="10.0.3" />
     <PackageReference Include="Npgsql.DependencyInjection" Version="10.0.3" />
@@ -17,6 +19,12 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Database\PostgreSQL\Migrations\Scripts\*.sql" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Program is the implicit internal top-level-statements class; the test project's
+         WebApplicationFactory<Program> needs access to it without a public partial marker. -->
+    <InternalsVisibleTo Include="SabemiTec.Tests" />
   </ItemGroup>
 
 </Project>

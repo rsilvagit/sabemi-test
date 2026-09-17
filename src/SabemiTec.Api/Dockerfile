@@ -18,4 +18,6 @@ EXPOSE 8080
 # Render (and most PaaS) inject $PORT at runtime and expect the container to bind to it;
 # docker-compose never sets PORT, so this falls back to 8080, matching the compose config.
 # `exec` keeps dotnet as PID 1 so it receives SIGTERM directly for graceful shutdown.
-ENTRYPOINT ["sh", "-c", "ASPNETCORE_URLS=http://+:${PORT:-8080} exec dotnet SabemiTec.Api.dll"]
+# "$@" forwards any docker-compose `command:` override (e.g. the one-shot `migrate` service)
+# through to the app; the trailing "--" becomes $0 so those extra args land in "$@" instead.
+ENTRYPOINT ["sh", "-c", "ASPNETCORE_URLS=http://+:${PORT:-8080} exec dotnet SabemiTec.Api.dll \"$@\"", "--"]

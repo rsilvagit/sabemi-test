@@ -16,25 +16,51 @@ services:
       retries: 20
       start_period: 5s
 
+  # One-shot: applies the schema (DbUp) and exits. The API no longer migrates itself on
+  # startup (see DatabaseMigrator), so this is what keeps `docker compose up` working
+  # out of the box against a fresh Postgres volume.
+  # ASPNETCORE_ENVIRONMENT=Development loads appsettings.Development.json inside the
+  # container (versioned — see src/SabemiTec.Api/appsettings.Development.json), which is
+  # where Webhook:ApiKey, Dashboard:ApiKey and Cors:DashboardOrigins now live for local
+  # testing. Only ConnectionStrings__Default stays overridden here: the container reaches
+  # Postgres via the `postgres` service name, while the committed
+  # appsettings.Development.json points at `localhost` for when the API runs directly on
+  # the host instead.
+  migrate:
+    build:
+      context: .
+      dockerfile: src/SabemiTec.Api/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Default: "Host=postgres;Port=5432;Database=sabemi;Username=sabemi;Password=sabemi"
+    command: ["migrate"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   api:
     build:
       context: .
       dockerfile: src/SabemiTec.Api/Dockerfile
     environment:
+      ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__Default: "Host=postgres;Port=5432;Database=sabemi;Username=sabemi;Password=sabemi"
-      Webhook__ApiKey: ${WEBHOOK_API_KEY:-dev-local-key}
-      Processing__SimulatedDelayMs: "2000"
     ports:
       - "8080:8080"
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   web:
     build:
       context: ./web
     environment:
-      WEBHOOK_API_KEY: ${WEBHOOK_API_KEY:-dev-local-key}
+      # This is the dashboard's key (Dashboard:ApiKey on the API), not the partner bank's
+      # webhook key — nginx injects it server-side on every /api proxy request. Must match
+      # appsettings.Development.json's Dashboard:ApiKey for the dashboard to authenticate.
+      DASHBOARD_API_KEY: ${DASHBOARD_API_KEY:-dev-local-dashboard-key}
     ports:
       - "5173:80"
     depends_on:

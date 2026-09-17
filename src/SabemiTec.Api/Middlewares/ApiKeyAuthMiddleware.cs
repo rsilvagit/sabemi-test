@@ -4,12 +4,13 @@ using System.Text;
 namespace SabemiTec.Api.Middlewares;
 
 /// <summary>
-/// Guards both the webhook ingestion and the dashboard read API with the same key — the
-/// dashboard never gets its own credential, it reuses this one via a header the reverse
-/// proxy injects (see web/nginx.conf.template), not something the browser ever sees.
-/// Constant-time comparison over fixed-size hashes: eliminates the length leak that
-/// FixedTimeEquals over raw bytes would have. A failure never persists anything and never
-/// logs the received value. Same shape as core.flashcard-master's
+/// Two separate keys, same header (X-Api-Key): Webhook:ApiKey is meant only for the partner
+/// bank, Dashboard:ApiKey only for the dashboard (injected server-side by nginx or baked into
+/// the JS bundle — see web/nginx.conf.template). Keeping them distinct means a leak of one
+/// (e.g. the dashboard's, which ends up client-side one way or another) never grants access
+/// to the other. Constant-time comparison over fixed-size hashes: eliminates the length leak
+/// that FixedTimeEquals over raw bytes would have. A failure never persists anything and
+/// never logs the received value. Same shape as core.flashcard-master's
 /// IaConvertWebhookAuthMiddleware — a classic middleware that checks the path itself,
 /// instead of a Minimal API endpoint filter.
 /// </summary>
@@ -18,18 +19,22 @@ public sealed class ApiKeyAuthMiddleware
     private const string HeaderName = "X-Api-Key";
 
     private readonly RequestDelegate _next;
-    private readonly string _expectedApiKey;
+    private readonly string _webhookApiKey;
+    private readonly string _dashboardApiKey;
 
     public ApiKeyAuthMiddleware(RequestDelegate next, IConfiguration configuration)
     {
         _next = next;
-        _expectedApiKey = configuration["Webhook:ApiKey"]
+        _webhookApiKey = configuration["Webhook:ApiKey"]
             ?? throw new InvalidOperationException("Webhook:ApiKey is not configured.");
+        _dashboardApiKey = configuration["Dashboard:ApiKey"]
+            ?? throw new InvalidOperationException("Dashboard:ApiKey is not configured.");
     }
 
     public async Task InvokeAsync(HttpContext context)
     {
-        if (!RequiresApiKey(context.Request.Path))
+        var expectedApiKey = ExpectedApiKeyFor(context.Request.Path);
+        if (expectedApiKey is null)
         {
             await _next(context);
             return;
@@ -37,7 +42,7 @@ public sealed class ApiKeyAuthMiddleware
 
         var provided = context.Request.Headers[HeaderName].ToString();
 
-        if (string.IsNullOrEmpty(provided) || !IsValid(provided, _expectedApiKey))
+        if (string.IsNullOrEmpty(provided) || !IsValid(provided, expectedApiKey))
         {
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
             context.Response.ContentType = "application/problem+json";
@@ -48,8 +53,20 @@ public sealed class ApiKeyAuthMiddleware
         await _next(context);
     }
 
-    private static bool RequiresApiKey(PathString path) =>
-        path.StartsWithSegments("/webhooks/payment") || path.StartsWithSegments("/api/payments");
+    private string? ExpectedApiKeyFor(PathString path)
+    {
+        if (path.StartsWithSegments("/webhooks/payment"))
+        {
+            return _webhookApiKey;
+        }
+
+        if (path.StartsWithSegments("/api/payments"))
+        {
+            return _dashboardApiKey;
+        }
+
+        return null;
+    }
 
     private static bool IsValid(string provided, string expected)
     {

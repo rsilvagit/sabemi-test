@@ -1,5 +1,5 @@
 @host = http://localhost:8080
-@apikey = dev-local-key
+@apikey = dev-local-webhook-key
 
 ### 1. Valid payment -> 202 Accepted
 POST {{host}}/webhooks/payment

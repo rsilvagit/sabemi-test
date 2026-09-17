@@ -12,7 +12,8 @@ public static class EndpointExtensions
         {
             uow.Open();
             return Results.Ok(new { status = "ok" });
-        });
+        })
+        .ExcludeFromDescription();
 
         app.MapPaymentWebhooks();
         app.MapDashboardEndpoints();

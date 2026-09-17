@@ -10,12 +10,14 @@ namespace SabemiTec.Tests.Integration;
 /// workerEnabled: true and a low/zero SimulatedDelayMs. Rate limit is wide open by default
 /// (large token limit) so unrelated tests never trip it; rate limit tests override it low.
 /// </summary>
-public sealed class SabemiWebApplicationFactory(
+internal sealed class SabemiWebApplicationFactory(
     string connectionString,
     bool workerEnabled = false,
     int simulatedDelayMs = 0,
     int rateLimitTokenLimit = 10_000,
-    int rateLimitTokensPerPeriod = 10_000) : WebApplicationFactory<Program>
+    int rateLimitTokensPerPeriod = 10_000,
+    string? webhookApiKey = null,
+    string? dashboardApiKey = null) : WebApplicationFactory<Program>
 {
     public const string TestApiKey = "test-api-key";
 
@@ -28,7 +30,8 @@ public sealed class SabemiWebApplicationFactory(
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:Default"] = connectionString,
-                ["Webhook:ApiKey"] = TestApiKey,
+                ["Webhook:ApiKey"] = webhookApiKey ?? TestApiKey,
+                ["Dashboard:ApiKey"] = dashboardApiKey ?? TestApiKey,
                 ["Processing:WorkerEnabled"] = workerEnabled.ToString(),
                 ["Processing:SimulatedDelayMs"] = simulatedDelayMs.ToString(),
                 ["Processing:PollIntervalMs"] = "100",

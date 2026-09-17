@@ -19,7 +19,7 @@ RUN npm run build
 FROM nginx:alpine AS runtime
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf.template /etc/nginx/templates/default.conf.template
-# PORT/API_ORIGIN/WEBHOOK_API_KEY defaults match docker-compose. On Render, PORT is
+# PORT/API_ORIGIN/DASHBOARD_API_KEY defaults match docker-compose. On Render, PORT is
 # injected automatically and API_ORIGIN must still be set to the API's public URL (even
 # though nginx's /api and /webhooks proxy locations go unused there now — the browser calls
 # the API directly, see above) because nginx resolves API_ORIGIN's hostname at startup and
@@ -27,5 +27,5 @@ COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 # resolve on Render's network, like the docker-compose default below, would crash it.
 ENV PORT=80
 ENV API_ORIGIN=http://api:8080
-ENV WEBHOOK_API_KEY=dev-local-key
+ENV DASHBOARD_API_KEY=dev-local-dashboard-key
 EXPOSE 80

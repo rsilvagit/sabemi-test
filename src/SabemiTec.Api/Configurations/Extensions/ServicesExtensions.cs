@@ -16,6 +16,26 @@ namespace SabemiTec.Api.Configurations.Extensions;
 /// </summary>
 public static class ServicesExtensions
 {
+    // Same JSON-file chain WebApplication.CreateBuilder already sets up, made explicit so it's
+    // easy to extend per environment. No AWS Systems Manager here — sabemi-tec keeps secrets in
+    // plain environment variables (Render env vars), unlike core.flashcard-master's SSM setup.
+    public static IConfigurationBuilder AddCustomConfiguration(
+        this IConfigurationBuilder builder,
+        IHostEnvironment env
+    )
+    {
+        builder
+            .SetBasePath(env.ContentRootPath)
+            .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+            .AddJsonFile(
+                $"appsettings.{env.EnvironmentName}.json",
+                optional: true,
+                reloadOnChange: true
+            );
+
+        return builder.AddEnvironmentVariables();
+    }
+
     public static IServiceCollection AddDatabase(this IServiceCollection services)
     {
         // Scoped, not singleton: IConfiguration is resolved from the request scope's
@@ -44,9 +64,14 @@ public static class ServicesExtensions
         return services;
     }
 
-    public static IServiceCollection AddProcessingFeature(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddProcessingFeature(
+        this IServiceCollection services,
+        IConfiguration configuration
+    )
     {
-        services.Configure<ProcessingOptions>(configuration.GetSection(ProcessingOptions.SectionName));
+        services.Configure<ProcessingOptions>(
+            configuration.GetSection(ProcessingOptions.SectionName)
+        );
         services.AddScoped<IOutboxClaimRepository, OutboxClaimRepository>();
         services.AddScoped<IContractStatusRepository, ContractStatusRepository>();
         services.AddScoped<PaymentEventProcessor>();
@@ -55,31 +80,42 @@ public static class ServicesExtensions
         return services;
     }
 
-    public static IServiceCollection AddDashboardFeature(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddDashboardFeature(this IServiceCollection services)
     {
         services.AddScoped<IPaymentQueryRepository, PaymentQueryRepository>();
 
-        // Cross-origin only where it has to be: on Render, nginx proxying /api to the API
-        // service hits a TLS handshake failure against Render's own edge, so the dashboard
-        // calls the API's public URL directly instead of same-origin through a proxy — see
-        // web/src/api/client.ts. Locally (Vite dev, docker-compose) this policy is unused,
-        // since same-origin requests never trigger CORS.
-        var dashboardOrigins = configuration.GetSection("Cors:DashboardOrigins").Get<string[]>() ?? [];
+        return services;
+    }
+
+    // Same method/policy name core.flashcard-master uses (AddCorsPolicy/"AllowSpecificOrigins"),
+    // adapted to this app's actual shape: a single browser client (the dashboard) reading GET
+    // endpoints with an X-Api-Key header — no AllowAnyHeader/AllowAnyMethod/AllowCredentials,
+    // and origins stay config-driven (Cors:DashboardOrigins) instead of hardcoded per
+    // environment, matching how the rest of this project configures things (RateLimiting,
+    // Webhook:ApiKey). Cross-origin only where it has to be: on Render, nginx proxying /api to
+    // the API service hits a TLS handshake failure against Render's own edge, so the dashboard
+    // calls the API's public URL directly instead of same-origin through a proxy — see
+    // web/src/api/client.ts. Locally (Vite dev, docker-compose) this policy is unused, since
+    // same-origin requests never trigger CORS.
+    public static IServiceCollection AddCorsPolicy(
+        this IServiceCollection services,
+        IConfiguration configuration
+    )
+    {
+        var dashboardOrigins =
+            configuration.GetSection("Cors:DashboardOrigins").Get<string[]>() ?? [];
+
         services.AddCors(options =>
         {
-            options.AddPolicy(DashboardCorsPolicy, policy =>
-                policy.WithOrigins(dashboardOrigins)
-                    .WithMethods("GET")
-                    .WithHeaders("X-Api-Key"));
+            options.AddPolicy(
+                DashboardCorsPolicy,
+                policy =>
+                    policy.WithOrigins(dashboardOrigins).WithMethods("GET").WithHeaders("X-Api-Key")
+            );
         });
 
         return services;
     }
 
-    // Same policy name core.flashcard-master uses (AddCorsPolicy/"AllowSpecificOrigins") —
-    // origins stay config-driven here (Cors:DashboardOrigins) instead of hardcoded per
-    // environment, matching how the rest of this project configures things (RateLimiting,
-    // Webhook:ApiKey), and the policy itself stays narrower (GET + X-Api-Key only, no
-    // AllowAnyHeader/AllowAnyMethod/AllowCredentials) since that's all the dashboard needs.
     public const string DashboardCorsPolicy = "AllowSpecificOrigins";
 }

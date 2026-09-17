@@ -12,20 +12,22 @@ Pré-requisito: Docker Desktop.
 docker compose up -d --build
 ```
 
-Isso sobe três serviços — Postgres, API e o dashboard (servido por nginx) — aplica as
-migrations automaticamente e deixa tudo pronto:
+Isso sobe três serviços — Postgres, API e o dashboard (servido por nginx). As migrations
+não rodam mais sozinhas: aplique-as manualmente antes do primeiro uso (veja
+`Database/PostgreSQL/Migrations/DatabaseMigrator.cs`) e o resto fica pronto:
 
 - **Dashboard**: http://localhost:5173
 - **API**: http://localhost:8080 (Swagger em `/swagger`)
-- **ApiKey de teste**: `dev-local-key` (header `X-Api-Key`, configurável em `.env` a partir
-  de `.env.example`)
+- **ApiKeys de teste** (chaves separadas — veja "Autenticação" abaixo): webhook
+  `dev-local-webhook-key`, dashboard `dev-local-dashboard-key` (header `X-Api-Key`; a do
+  dashboard é configurável em `.env` a partir de `.env.example`)
 
 Para gerar dados de exemplo, use a collection `requests/webhooks.http` (abre direto no
 VS Code/Rider) ou:
 
 ```bash
 curl -X POST http://localhost:8080/webhooks/payment \
-  -H "Content-Type: application/json" -H "X-Api-Key: dev-local-key" \
+  -H "Content-Type: application/json" -H "X-Api-Key: dev-local-webhook-key" \
   -d '{"id_transacao":"TX-001","id_contrato":"CT-42","valor":150.50,"data_pagamento":"2026-09-15T10:00:00Z","status":"PAGO"}'
 ```
 
@@ -46,7 +48,7 @@ negativo: é um dashboard de liquidação de parcela, não de movimentação de 
 existe "saque" nesse domínio.
 
 ```bash
-STG_WEBHOOK_API_KEY=<chave real do Webhook__ApiKey do sabemi-api> \
+STG_WEBHOOK_API_KEY=<chave real do Webhook__ApiKey do sabemi-api, não a do dashboard> \
   docker compose --profile simulator up -d --build
 ```
 
@@ -211,22 +213,33 @@ req/min por IP): o padrão de tráfego é outro — polling humano de uma aba de
 rajada de parceiro — e partitionar por ApiKey não faria sentido aqui, já que todo cliente do
 dashboard compartilha a mesma chave (ver seção de autenticação abaixo).
 
+### Duas ApiKeys, uma pro webhook e outra pro dashboard
+
+`ApiKeyAuthMiddleware` protege os dois grupos de rota (`/webhooks/payment` e
+`/api/payments*`), mas com **chaves diferentes** — `Webhook:ApiKey` e `Dashboard:ApiKey`,
+mesmo header `X-Api-Key`. Antes as duas rotas compartilhavam a mesma chave; separadas
+porque a chave do dashboard inevitavelmente acaba do lado do cliente (bakeada no bundle JS
+em produção, ver abaixo), então um vazamento dela nunca deve dar acesso a `POST
+/webhooks/payment` — só o banco parceiro deve ter `Webhook:ApiKey`.
+
 ### O dashboard também exige ApiKey — local via proxy, no Render via CORS
 
 `GET /api/payments` é dado de pagamento; publicado sem auth, qualquer um na internet lê
-tudo. A `ApiKeyAuthMiddleware` (a mesma do webhook) passou a proteger os dois grupos de
-rota. Localmente (docker-compose, `npm run dev`) o browser nunca vê a chave: o nginx do
-serviço `web` (ou o proxy de dev do Vite) injeta o header `X-Api-Key` em toda requisição
-proxied para `/api/`, lida em runtime via `envsubst`/`vite.config.ts`.
+tudo. Localmente (docker-compose, `npm run dev`) o browser nunca vê a chave: o nginx do
+serviço `web` (ou o proxy de dev do Vite) injeta o header `X-Api-Key` (a chave do
+dashboard, `Dashboard:ApiKey`) em toda requisição proxied para `/api/`, lida em runtime via
+`envsubst`/`vite.config.ts`.
 
 No Render isso não é possível — ver a seção de arquitetura de deploy logo abaixo, que
 explica por que o proxy nginx→API não funciona lá — então o browser chama a API
 diretamente (`https://sabemi-api.onrender.com`, CORS liberado só para `GET` em
 `/api/payments*` e só para a origem do `sabemi-web`) e manda a `X-Api-Key` ele mesmo, lida
 de uma variável bakeada no bundle JS em build time (`VITE_API_KEY`, ver
-`.github/workflows/deploy.yml`). Isso não é uma regressão de segurança real: a chave nunca
-foi um segredo forte (é só um filtro contra scraping casual, já era isso mesmo quando só o
-proxy a conhecia), e a alternativa — desistir da auth no `GET` — seria pior.
+`.github/workflows/deploy-web.yml`). Isso não é uma regressão de segurança real: a chave do
+dashboard nunca foi um segredo forte (é só um filtro contra scraping casual, já era isso
+mesmo quando só o proxy a conhecia), e a alternativa — desistir da auth no `GET` — seria
+pior. É exatamente por essa exposição inevitável que ela precisa ser uma chave própria,
+diferente da do webhook.
 
 ### Vertical slice, não Clean Architecture / DDD tático / hexagonal
 
@@ -390,8 +403,8 @@ abaixo é exatamente o que clicar.
    ```
    Host=db.<seu-projeto>.supabase.co;Port=5432;Database=postgres;Username=postgres;Password=<sua-senha>;SSL Mode=Require;Trust Server Certificate=true
    ```
-   As migrations rodam sozinhas no startup da API (`DatabaseMigrator`) — não precisa aplicar
-   o schema manualmente.
+   O `DatabaseMigrator` não roda mais automaticamente no startup da API — aplique o schema
+   manualmente contra essa connection string antes do primeiro deploy.
 
 ### 2. Serviços (Render)
 
@@ -401,28 +414,33 @@ Crie **dois** Web Services e, opcionalmente, **um** Background Worker, todos com
 **`sabemi-api`**
 - Imagem: `ghcr.io/<seu-usuario>/<repo>-api:latest`
 - Health check path: `/health`
+- Sem `ASPNETCORE_ENVIRONMENT` configurado, o Render roda em `Production` por padrão, o que
+  carrega `src/SabemiTec.Api/appsettings.Production.json` — esse arquivo é versionado e só
+  declara as chaves com placeholder vazio (nunca o valor real); as env vars abaixo sempre
+  sobrescrevem esses placeholders em runtime.
 - Variáveis de ambiente:
   | Nome | Valor |
   |---|---|
   | `ConnectionStrings__Default` | a connection string do Supabase (passo 1.3) |
-  | `Webhook__ApiKey` | uma chave real, gerada por você — **não** `dev-local-key` |
+  | `Webhook__ApiKey` | uma chave real, gerada por você — **só o banco parceiro deve ter essa** |
+  | `Dashboard__ApiKey` | outra chave real, diferente da de cima — essa vai parar num bundle JS público, então nunca deve dar acesso ao webhook |
   | `Processing__SimulatedDelayMs` | `2000` (opcional, é o default) |
   | `Cors__DashboardOrigins__0` | a URL pública do `sabemi-web` (ex.: `https://sabemi-web.onrender.com`) |
 - `PORT` **não precisa ser configurado** — o Render injeta automaticamente e o Dockerfile já
   lê `$PORT` (ver `src/SabemiTec.Api/Dockerfile`).
 - Depois de criado, copie a URL pública (ex.: `https://sabemi-api.onrender.com`) — o passo do
-  secret `WEBHOOK_API_KEY` abaixo e o `sabemi-web` dependem dela.
+  secret `DASHBOARD_API_KEY` abaixo e o `sabemi-web` dependem dela.
 
 **`sabemi-web`**
 - Imagem: `ghcr.io/<seu-usuario>/<repo>-web:latest`
-- Não precisa de variáveis de ambiente específicas — `API_ORIGIN`/`WEBHOOK_API_KEY` ficam nos
-  defaults do Dockerfile (não são usados de verdade em produção, ver abaixo).
-- **Antes de dar push**: cadastre o secret `WEBHOOK_API_KEY` no GitHub (mesmo valor do
-  `Webhook__ApiKey` do `sabemi-api`) — o CI passa ele como build-arg pro `npm run build` do
-  `sabemi-web`, bakeando no bundle JS. Sem isso a imagem builda com uma chave vazia e o
-  dashboard não autentica. Ver por quê na seção "Deploy no Render" acima: o nginx do
-  `sabemi-web` não consegue proxyar pro `sabemi-api` lá, então o browser chama a API
-  diretamente e manda a chave ele mesmo.
+- Não precisa de variáveis de ambiente específicas — `API_ORIGIN`/`DASHBOARD_API_KEY` ficam
+  nos defaults do Dockerfile (não são usados de verdade em produção, ver abaixo).
+- **Antes de dar push**: cadastre o secret `DASHBOARD_API_KEY` no GitHub (mesmo valor do
+  `Dashboard__ApiKey` do `sabemi-api` — **nunca** o `Webhook__ApiKey`) — o CI passa ele como
+  build-arg pro `npm run build` do `sabemi-web`, bakeando no bundle JS. Sem isso a imagem
+  builda com uma chave vazia e o dashboard não autentica. Ver por quê na seção "Deploy no
+  Render" acima: o nginx do `sabemi-web` não consegue proxyar pro `sabemi-api` lá, então o
+  browser chama a API diretamente e manda a chave ele mesmo.
 
 Em ambos os serviços, pegue a **Deploy Hook URL** em *Settings → Deploy Hook* — é o que o
 GitHub Actions vai chamar quando você rodar o workflow manual daquela aplicação.
@@ -444,7 +462,7 @@ Em *Settings → Secrets and variables → Actions* do repositório:
 |---|---|
 | `RENDER_DEPLOY_HOOK_API` | Deploy Hook do serviço `sabemi-api` |
 | `RENDER_DEPLOY_HOOK_WEB` | Deploy Hook do serviço `sabemi-web` |
-| `WEBHOOK_API_KEY` | a mesma chave real usada em `Webhook__ApiKey` no `sabemi-api` — bakeada no bundle do `sabemi-web` em build time |
+| `DASHBOARD_API_KEY` | a mesma chave real usada em `Dashboard__ApiKey` no `sabemi-api` — bakeada no bundle do `sabemi-web` em build time. **Não** é o `Webhook__ApiKey` do banco parceiro. |
 
 `GITHUB_TOKEN` (usado para publicar no GHCR) já existe automaticamente em todo repositório —
 não precisa criar.
