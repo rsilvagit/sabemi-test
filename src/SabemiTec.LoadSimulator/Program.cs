@@ -20,12 +20,6 @@ if (string.IsNullOrEmpty(webhookApiKey))
 {
     throw new InvalidOperationException("WEBHOOK_API_KEY is required.");
 }
-// Optional: only used for the startup GET /api/payments/contracts call, which is a dashboard
-// route and now requires Dashboard:ApiKey, not Webhook:ApiKey (the two were split so a leak
-// of the dashboard's key — which inevitably ends up client-side — can never authenticate as
-// the partner bank). Left unset, that call 401s and FetchContractsAsync falls back to the
-// fixed contract list, same as it already does for any other startup failure.
-var dashboardApiKey = Environment.GetEnvironmentVariable("DASHBOARD_API_KEY");
 var intervalSeconds = int.TryParse(Environment.GetEnvironmentVariable("INTERVAL_SECONDS"), out var parsed)
     ? parsed
     : 5;
@@ -34,20 +28,21 @@ var concurrentRequests = int.TryParse(Environment.GetEnvironmentVariable("CONCUR
     : 5;
 
 // A single HttpClient is thread-safe for concurrent requests by design; Random.Shared (not
-// `new Random()`) is what makes BuildPayload safe to call from multiple tasks at once. No
-// default X-Api-Key header here — the contract fetch and the webhook posts need different
-// keys, so each request sets its own.
+// `new Random()`) is what makes BuildPayload safe to call from multiple tasks at once. Both
+// /webhooks/contracts and /webhooks/payment take the same key — this worker only ever needs
+// Webhook:ApiKey, never Dashboard:ApiKey (see ApiKeyAuthMiddleware).
 using var client = new HttpClient { BaseAddress = new Uri(apiUrl) };
+client.DefaultRequestHeaders.Add("X-Api-Key", webhookApiKey);
 
 using var cts = new CancellationTokenSource();
 Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
 AppDomain.CurrentDomain.ProcessExit += (_, _) => cts.Cancel();
 
-// Pulled from GET /api/payments/contracts instead of hardcoded, so this never drifts from
-// what is actually seeded (migrations 0002/0003) — includes installments/total_value, not
-// just the ID, so BuildPayload can post a valor consistent with the contract instead of an
-// arbitrary number that visibly doesn't divide into it.
-var contracts = await FetchContractsAsync(client, dashboardApiKey, jsonReadOptions, cts.Token);
+// Pulled from GET /webhooks/contracts instead of hardcoded, so this never drifts from what is
+// actually seeded (migrations 0002/0003) — includes installments/total_value, not just the
+// ID, so BuildPayload can post a valor consistent with the contract instead of an arbitrary
+// number that visibly doesn't divide into it.
+var contracts = await FetchContractsAsync(client, jsonReadOptions, cts.Token);
 
 Console.WriteLine(
     $"Load simulator started. Target={apiUrl} Interval={intervalSeconds}s ConcurrentRequests={concurrentRequests} Contracts={contracts.Length}");
@@ -59,7 +54,7 @@ do
     // Fires a burst of concurrent transactions per tick instead of one at a time — closer to
     // how a partner bank actually flushes a batch, and it exercises the idempotency/locking
     // paths (ON CONFLICT, FOR UPDATE SKIP LOCKED) under real concurrency, not just in tests.
-    var sends = Enumerable.Range(0, concurrentRequests).Select(_ => SendOneAsync(client, webhookApiKey, contracts, cts.Token));
+    var sends = Enumerable.Range(0, concurrentRequests).Select(_ => SendOneAsync(client, contracts, cts.Token));
     await Task.WhenAll(sends);
 } while (await timer.WaitForNextTickAsync(cts.Token));
 
@@ -69,7 +64,7 @@ return;
 // parallel), so this retries a handful of times before giving up. If the endpoint is
 // unreachable, falls back to a fixed list matching migrations 0002/0003/0004 exactly — keeps
 // the worker usable and still consistent, just without the drift protection a live fetch gives.
-static async Task<ContractInfo[]> FetchContractsAsync(HttpClient client, string? dashboardApiKey, JsonSerializerOptions jsonOptions, CancellationToken ct)
+static async Task<ContractInfo[]> FetchContractsAsync(HttpClient client, JsonSerializerOptions jsonOptions, CancellationToken ct)
 {
     ContractInfo[] fallback =
     [
@@ -83,19 +78,11 @@ static async Task<ContractInfo[]> FetchContractsAsync(HttpClient client, string?
         new("CT-1008", "Seguro", 12, 1800.00m),
     ];
 
-    if (string.IsNullOrEmpty(dashboardApiKey))
-    {
-        Console.WriteLine($"[{DateTime.UtcNow:O}] DASHBOARD_API_KEY nao configurada, usando lista de contratos fixa de fallback ({fallback.Length} contratos).");
-        return fallback;
-    }
-
     for (var attempt = 1; attempt <= 5; attempt++)
     {
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, "/api/payments/contracts");
-            request.Headers.Add("X-Api-Key", dashboardApiKey);
-            var response = await client.SendAsync(request, ct);
+            var response = await client.GetAsync("/webhooks/contracts", ct);
             if (response.IsSuccessStatusCode)
             {
                 var contracts = await response.Content.ReadFromJsonAsync<ContractInfo[]>(jsonOptions, ct);
@@ -105,7 +92,7 @@ static async Task<ContractInfo[]> FetchContractsAsync(HttpClient client, string?
                 }
             }
 
-            Console.WriteLine($"[{DateTime.UtcNow:O}] GET /api/payments/contracts -> HTTP {(int)response.StatusCode} (tentativa {attempt}/5)");
+            Console.WriteLine($"[{DateTime.UtcNow:O}] GET /webhooks/contracts -> HTTP {(int)response.StatusCode} (tentativa {attempt}/5)");
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -119,19 +106,15 @@ static async Task<ContractInfo[]> FetchContractsAsync(HttpClient client, string?
     return fallback;
 }
 
-static async Task SendOneAsync(HttpClient client, string webhookApiKey, ContractInfo[] contracts, CancellationToken ct)
+static async Task SendOneAsync(HttpClient client, ContractInfo[] contracts, CancellationToken ct)
 {
     var payload = BuildPayload(contracts);
     var json = JsonSerializer.Serialize(payload);
 
     try
     {
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/webhooks/payment")
-        {
-            Content = new StringContent(json, Encoding.UTF8, "application/json"),
-        };
-        request.Headers.Add("X-Api-Key", webhookApiKey);
-        using var response = await client.SendAsync(request, ct);
+        using var content = new StringContent(json, Encoding.UTF8, "application/json");
+        using var response = await client.PostAsync("/webhooks/payment", content, ct);
 
         Console.WriteLine(
             $"[{DateTime.UtcNow:O}] {payload.GetValueOrDefault("id_transacao") ?? "(sem id_transacao)"} -> HTTP {(int)response.StatusCode}");

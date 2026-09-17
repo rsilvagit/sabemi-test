@@ -37,8 +37,8 @@ public static class DashboardRouteHandler
             .Produces(StatusCodes.Status429TooManyRequests)
             .WithOpenApi();
 
-        // Demo-only: lets a synthetic traffic generator (SabemiTec.LoadSimulator) target
-        // real seeded contracts instead of hardcoding a list that can drift from the DB.
+        // Feeds the "Todos os contratos" filter dropdown in the dashboard UI. Also mapped at
+        // GET /webhooks/contracts for SabemiTec.LoadSimulator — see that handler for why.
         group.MapGet("/contracts", GetContractIdsAsync)
             .WithName("ListContractIds")
             .Produces(StatusCodes.Status200OK)
@@ -97,7 +97,10 @@ public static class DashboardRouteHandler
         return Results.Ok(new PaymentStatsDto(stats.Total, stats.Success, stats.Error, stats.Pending));
     }
 
-    private static async Task<IResult> GetContractIdsAsync(IPaymentQueryRepository repository, IUnitOfWork uow, CancellationToken ct)
+    // Internal, not private: also mapped at GET /webhooks/contracts (PaymentWebhookRouteHandler)
+    // for SabemiTec.LoadSimulator, which needs real contract ids but has no business holding
+    // Dashboard:ApiKey — same handler, same data, exposed under whichever key fits the caller.
+    internal static async Task<IResult> GetContractIdsAsync(IPaymentQueryRepository repository, IUnitOfWork uow, CancellationToken ct)
     {
         uow.Open();
 

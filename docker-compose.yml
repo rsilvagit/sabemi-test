@@ -83,10 +83,6 @@ services:
       # `docker compose up` (no --profile simulator) too. Left empty, the container itself
       # (only started when the profile is active) fails fast with a clear message instead.
       WEBHOOK_API_KEY: ${STG_WEBHOOK_API_KEY:-}
-      # Optional: GET /api/payments/contracts is a dashboard route now (Dashboard:ApiKey,
-      # not Webhook:ApiKey — see ApiKeyAuthMiddleware). Without it, FetchContractsAsync just
-      # falls back to its fixed contract list, so the simulator still works either way.
-      DASHBOARD_API_KEY: ${STG_DASHBOARD_API_KEY:-}
       INTERVAL_SECONDS: ${LOAD_SIMULATOR_INTERVAL_SECONDS:-25}
       CONCURRENT_REQUESTS: ${LOAD_SIMULATOR_CONCURRENCY:-5}
 

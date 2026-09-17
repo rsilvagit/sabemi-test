@@ -55,7 +55,10 @@ public sealed class ApiKeyAuthMiddleware
 
     private string? ExpectedApiKeyFor(PathString path)
     {
-        if (path.StartsWithSegments("/webhooks/payment"))
+        // Everything under /webhooks (including /webhooks/contracts, used by
+        // SabemiTec.LoadSimulator to look up real contract ids) takes the partner bank's
+        // key — none of it is ever called from a browser, so it never needs Dashboard:ApiKey.
+        if (path.StartsWithSegments("/webhooks"))
         {
             return _webhookApiKey;
         }

@@ -40,18 +40,17 @@ Pra ver o dashboard [em produção](https://sabemi-web.onrender.com) se movendo 
 de gerar eventos manualmente, rode localmente o worker `load-simulator` — ele faz o papel do
 banco parceiro, disparando um **lote de transações concorrentes** (`CONCURRENT_REQUESTS`, 5
 por padrão) a cada 25s contra `POST /webhooks/payment`, contra a API de staging no Render.
-Busca a lista de contratos reais em `GET /api/payments/contracts` no startup (com retry, já
-que a API pode não estar pronta ainda) em vez de hardcoded, pra nunca divergir do que está
-seedado — essa rota é do dashboard, então precisa de `STG_DASHBOARD_API_KEY` (opcional: sem
-ela, ou se a chave estiver errada, cai direto na lista fixa de contratos, o worker continua
-funcionando normalmente). Mistura payloads válidos (`PAGO`/`FALHA`) e inválidos —
-`id_transacao` ausente, `status` desconhecido — pra exercitar o caminho de erro de validação.
-Sem cenário de valor negativo: é um dashboard de liquidação de parcela, não de movimentação
-de conta, então não existe "saque" nesse domínio.
+Busca a lista de contratos reais em `GET /webhooks/contracts` no startup (com retry, já que
+a API pode não estar pronta ainda) em vez de hardcoded, pra nunca divergir do que está
+seedado — mesmos dados de `GET /api/payments/contracts` (usada pelo filtro do dashboard),
+espelhados sob `/webhooks` pra não depender de `Dashboard:ApiKey`: o worker só precisa da
+chave do webhook, a mesma que já usa pra postar os pagamentos. Mistura payloads válidos
+(`PAGO`/`FALHA`) e inválidos — `id_transacao` ausente, `status` desconhecido — pra exercitar
+o caminho de erro de validação. Sem cenário de valor negativo: é um dashboard de liquidação
+de parcela, não de movimentação de conta, então não existe "saque" nesse domínio.
 
 ```bash
 STG_WEBHOOK_API_KEY=<chave real do Webhook__ApiKey do sabemi-api, não a do dashboard> \
-STG_DASHBOARD_API_KEY=<chave real do Dashboard__ApiKey do sabemi-api, opcional> \
   docker compose --profile simulator up -d --build
 ```
 
@@ -301,7 +300,8 @@ A partir daí, por `LEFT JOIN` com essa tabela:
   pra Empréstimo/Seguro com parcelamento, `total_value` direto se não houver. Sem isso o
   `load-simulator` gerava um valor aleatório desconectado do contrato (ex.: uma "parcela" de
   R$ 53,46 num empréstimo de R$ 6.000/12, que não fecha matematicamente — sinalizado pelo
-  usuário). `GET /api/payments/contracts` retorna o contrato completo (não só o ID) pra isso.
+  usuário). `GET /api/payments/contracts` (dashboard) / `GET /webhooks/contracts` (worker) retornam o
+  contrato completo (não só o ID) pra isso.
 - Filtro de contrato: **dropdown** com os contratos reais, não texto livre — elimina digitar
   um ID errado ou inexistente.
 - Filtro por **Tipo de Contrato** (Empréstimo/Seguro) na `FiltersBar`.
