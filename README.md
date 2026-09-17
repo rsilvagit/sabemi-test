@@ -109,7 +109,10 @@ mesmo processo, sem `Task.Run` fire-and-forget). O worker reivindica lotes com
 negócio; upsert do contrato + marcar `Processed` ficam dentro da mesma transação. Falha de
 negócio tenta de novo 3× (30s fixo), depois `DeadLettered`.
 
-**Dapper + `IUnitOfWork` só onde há transação real.**
+**`IUnitOfWork` injetado só onde há transação real.** Fora daí, os repositórios usam
+`IDatabaseConnection` direto e deixam o Dapper abrir/fechar a conexão por chamada — nenhum
+handler de leitura ou o `POST /webhooks/payment` (um único INSERT) precisa gerenciar conexão
+manualmente.
 
 | Caminho | Transação? |
 |---|---|

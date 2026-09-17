@@ -4,8 +4,8 @@ using SabemiTec.Api.Database.PostgreSQL.Sql;
 
 namespace SabemiTec.Api.Features.Dashboard.Repositories;
 
-/// <summary>Read-only — no transaction here on purpose, just the shared request connection
-/// opened by the route handler via IUnitOfWork.Open().</summary>
+/// <summary>Read-only — no transaction here on purpose. Dapper opens/closes the connection
+/// per call on its own; nothing here needs it kept open across calls.</summary>
 internal sealed class PaymentQueryRepository(IDatabaseConnection db) : IPaymentQueryRepository
 {
     public async Task<(IReadOnlyList<PaymentListItem> Items, bool HasMore)> SearchAsync(PaymentQuery query, CancellationToken ct)

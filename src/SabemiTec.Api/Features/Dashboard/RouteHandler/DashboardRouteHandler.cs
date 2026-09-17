@@ -1,6 +1,5 @@
 using SabemiTec.Api.Configurations.Extensions;
 using SabemiTec.Api.Configurations.RateLimiting;
-using SabemiTec.Api.Database.PostgreSQL;
 using SabemiTec.Api.Features.Dashboard.DTO;
 using SabemiTec.Api.Features.Dashboard.Repositories;
 
@@ -61,7 +60,6 @@ public static class DashboardRouteHandler
 
     private static async Task<IResult> SearchAsync(
         IPaymentQueryRepository repository,
-        IUnitOfWork uow,
         CancellationToken ct,
         string? status = null,
         string? contractId = null,
@@ -69,8 +67,6 @@ public static class DashboardRouteHandler
         int page = 1,
         int pageSize = 25)
     {
-        uow.Open();
-
         var query = new PaymentQuery(status, contractId, contractType, page <= 0 ? 1 : page, pageSize <= 0 ? 25 : pageSize);
         var (items, hasMore) = await repository.SearchAsync(query, ct);
 
@@ -81,18 +77,14 @@ public static class DashboardRouteHandler
             hasMore));
     }
 
-    private static async Task<IResult> GetByIdAsync(long id, IPaymentQueryRepository repository, IUnitOfWork uow, CancellationToken ct)
+    private static async Task<IResult> GetByIdAsync(long id, IPaymentQueryRepository repository, CancellationToken ct)
     {
-        uow.Open();
-
         var detail = await repository.FindByIdAsync(id, ct);
         return detail is null ? Results.NotFound() : Results.Ok(ToDetailDto(detail));
     }
 
-    private static async Task<IResult> GetStatsAsync(IPaymentQueryRepository repository, IUnitOfWork uow, CancellationToken ct)
+    private static async Task<IResult> GetStatsAsync(IPaymentQueryRepository repository, CancellationToken ct)
     {
-        uow.Open();
-
         var stats = await repository.GetStatsAsync(ct);
         return Results.Ok(new PaymentStatsDto(stats.Total, stats.Success, stats.Error, stats.Pending));
     }
@@ -100,23 +92,18 @@ public static class DashboardRouteHandler
     // Internal, not private: also mapped at GET /webhooks/contracts (PaymentWebhookRouteHandler)
     // for SabemiTec.LoadSimulator, which needs real contract ids but has no business holding
     // Dashboard:ApiKey — same handler, same data, exposed under whichever key fits the caller.
-    internal static async Task<IResult> GetContractIdsAsync(IPaymentQueryRepository repository, IUnitOfWork uow, CancellationToken ct)
+    internal static async Task<IResult> GetContractIdsAsync(IPaymentQueryRepository repository, CancellationToken ct)
     {
-        uow.Open();
-
         var contracts = await repository.ListContractsAsync(ct);
         return Results.Ok(contracts.Select(c => new ContractDto(c.ContractId, c.ContractType, c.Installments, c.TotalValue)).ToList());
     }
 
     private static async Task<IResult> SearchInvalidAsync(
         IPaymentQueryRepository repository,
-        IUnitOfWork uow,
         CancellationToken ct,
         int page = 1,
         int pageSize = 25)
     {
-        uow.Open();
-
         page = page <= 0 ? 1 : page;
         pageSize = pageSize <= 0 ? 25 : pageSize;
 

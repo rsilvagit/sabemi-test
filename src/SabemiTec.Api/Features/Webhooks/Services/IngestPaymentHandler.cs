@@ -1,7 +1,6 @@
 using System.Text.Json;
 using SabemiTec.Api.ACL;
 using SabemiTec.Api.ACL.Responses;
-using SabemiTec.Api.Database.PostgreSQL;
 using SabemiTec.Api.Enum;
 using SabemiTec.Api.Features.Webhooks.Repositories;
 
@@ -18,15 +17,13 @@ public sealed record IngestPaymentResult(IngestOutcome Outcome, long? EventId, s
 
 /// <summary>
 /// Flow of POST /webhooks/payment: translate via the ACL, do a single idempotent INSERT,
-/// and return the outcome. No transaction here on purpose — a single write doesn't need one
-/// (see plan section 6.5) — but the connection still needs to be opened first.
+/// and return the outcome. No transaction here on purpose — a single write doesn't need one.
+/// Dapper opens/closes the connection per call on its own, so there's nothing to manage here.
 /// </summary>
-public sealed class IngestPaymentHandler(IPaymentWebhookAcl acl, IPaymentEventRepository repository, IUnitOfWork uow)
+public sealed class IngestPaymentHandler(IPaymentWebhookAcl acl, IPaymentEventRepository repository)
 {
     public async Task<IngestPaymentResult> HandleAsync(JsonElement body, CancellationToken ct)
     {
-        uow.Open();
-
         var translated = acl.Translate(body);
 
         var command = new InsertPaymentEventCommand(

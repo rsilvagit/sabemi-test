@@ -4,8 +4,8 @@ using SabemiTec.Api.Database.PostgreSQL.Sql;
 
 namespace SabemiTec.Api.Features.Webhooks.Repositories;
 
-/// <summary>Never opens its own connection — always uses the current request's shared
-/// IDatabaseConnection, opened by the caller via IUnitOfWork.Open().</summary>
+/// <summary>No transaction here on purpose — a single INSERT doesn't need one. Dapper opens
+/// and closes the connection per call on its own.</summary>
 internal sealed class PaymentEventRepository(IDatabaseConnection db) : IPaymentEventRepository
 {
     public async Task<long?> InsertIfNotExistsAsync(InsertPaymentEventCommand command, CancellationToken ct)
