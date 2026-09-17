@@ -1,12 +1,9 @@
-using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using Dapper;
+using Npgsql;
 
-// The API serializes camelCase (ASP.NET Core Minimal API default); this project's own
-// JsonSerializer.Serialize calls use the Dictionary<string, object?> keys verbatim (already
-// snake_case, the bank's own vocabulary) so this is only needed for reading the API's
-// responses back, not for building outgoing payloads.
-var jsonReadOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+Dapper.DefaultTypeMap.MatchNamesWithUnderscores = true;
 
 // Stands in for the partner bank: keeps POSTing synthetic payloads at
 // /webhooks/payment over real HTTP (same auth, same idempotency, same async
@@ -20,6 +17,11 @@ if (string.IsNullOrEmpty(webhookApiKey))
 {
     throw new InvalidOperationException("WEBHOOK_API_KEY is required.");
 }
+// Only used to read the contract seed list directly (see FetchContractsAsync) — not required
+// for posting webhooks. This is a simulator talking to its own test/demo database, not a real
+// partner bank, so reading the table directly is an acceptable shortcut here; the API itself
+// never gets this credential.
+var dbConnectionString = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING");
 var intervalSeconds = int.TryParse(Environment.GetEnvironmentVariable("INTERVAL_SECONDS"), out var parsed)
     ? parsed
     : 5;
@@ -28,9 +30,7 @@ var concurrentRequests = int.TryParse(Environment.GetEnvironmentVariable("CONCUR
     : 5;
 
 // A single HttpClient is thread-safe for concurrent requests by design; Random.Shared (not
-// `new Random()`) is what makes BuildPayload safe to call from multiple tasks at once. Both
-// /webhooks/contracts and /webhooks/payment take the same key — this worker only ever needs
-// Webhook:ApiKey, never Dashboard:ApiKey (see ApiKeyAuthMiddleware).
+// `new Random()`) is what makes BuildPayload safe to call from multiple tasks at once.
 using var client = new HttpClient { BaseAddress = new Uri(apiUrl) };
 client.DefaultRequestHeaders.Add("X-Api-Key", webhookApiKey);
 
@@ -38,11 +38,11 @@ using var cts = new CancellationTokenSource();
 Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
 AppDomain.CurrentDomain.ProcessExit += (_, _) => cts.Cancel();
 
-// Pulled from GET /webhooks/contracts instead of hardcoded, so this never drifts from what is
-// actually seeded (migrations 0002/0003) — includes installments/total_value, not just the
-// ID, so BuildPayload can post a valor consistent with the contract instead of an arbitrary
-// number that visibly doesn't divide into it.
-var contracts = await FetchContractsAsync(client, jsonReadOptions, cts.Token);
+// Read straight from the `contract` table instead of calling the API, so this never drifts
+// from what is actually seeded (migrations 0002/0003) — includes installments/total_value,
+// not just the ID, so BuildPayload can post a valor consistent with the contract instead of
+// an arbitrary number that visibly doesn't divide into it.
+var contracts = await FetchContractsAsync(dbConnectionString, cts.Token);
 
 Console.WriteLine(
     $"Load simulator started. Target={apiUrl} Interval={intervalSeconds}s ConcurrentRequests={concurrentRequests} Contracts={contracts.Length}");
@@ -60,11 +60,12 @@ do
 
 return;
 
-// The API container may not be reachable yet on cold start (compose brings services up in
-// parallel), so this retries a handful of times before giving up. If the endpoint is
-// unreachable, falls back to a fixed list matching migrations 0002/0003/0004 exactly — keeps
-// the worker usable and still consistent, just without the drift protection a live fetch gives.
-static async Task<ContractInfo[]> FetchContractsAsync(HttpClient client, JsonSerializerOptions jsonOptions, CancellationToken ct)
+// The Postgres container may not be reachable yet on cold start (compose brings services up
+// in parallel), so this retries a handful of times before giving up. If the query fails,
+// falls back to a fixed list matching migrations 0002/0003/0004 exactly — keeps the worker
+// usable and still consistent, just without the drift protection a live read gives. No
+// DB_CONNECTION_STRING configured skips straight to the fallback.
+static async Task<ContractInfo[]> FetchContractsAsync(string? connectionString, CancellationToken ct)
 {
     ContractInfo[] fallback =
     [
@@ -78,21 +79,26 @@ static async Task<ContractInfo[]> FetchContractsAsync(HttpClient client, JsonSer
         new("CT-1008", "Seguro", 12, 1800.00m),
     ];
 
+    if (string.IsNullOrEmpty(connectionString))
+    {
+        Console.WriteLine($"[{DateTime.UtcNow:O}] DB_CONNECTION_STRING nao configurada, usando lista de contratos fixa de fallback ({fallback.Length} contratos).");
+        return fallback;
+    }
+
+    const string sql = "select contract_id, contract_type, installments, total_value from contract order by contract_id;";
+
     for (var attempt = 1; attempt <= 5; attempt++)
     {
         try
         {
-            var response = await client.GetAsync("/webhooks/contracts", ct);
-            if (response.IsSuccessStatusCode)
+            await using var conn = new NpgsqlConnection(connectionString);
+            var contracts = (await conn.QueryAsync<ContractInfo>(sql)).ToArray();
+            if (contracts.Length > 0)
             {
-                var contracts = await response.Content.ReadFromJsonAsync<ContractInfo[]>(jsonOptions, ct);
-                if (contracts is { Length: > 0 })
-                {
-                    return contracts;
-                }
+                return contracts;
             }
 
-            Console.WriteLine($"[{DateTime.UtcNow:O}] GET /webhooks/contracts -> HTTP {(int)response.StatusCode} (tentativa {attempt}/5)");
+            Console.WriteLine($"[{DateTime.UtcNow:O}] tabela contract vazia (tentativa {attempt}/5)");
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

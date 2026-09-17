@@ -8,6 +8,9 @@ COPY src/SabemiTec.LoadSimulator/ src/SabemiTec.LoadSimulator/
 RUN dotnet publish src/SabemiTec.LoadSimulator/SabemiTec.LoadSimulator.csproj -c Release -o /app --no-restore
 
 FROM mcr.microsoft.com/dotnet/runtime:8.0-alpine AS runtime
+# Npgsql probes for GSSAPI (Kerberos) support on connect; without krb5-libs it still falls
+# back and works, but prints "Cannot load library libgssapi_krb5.so.2" on every run.
+RUN apk add --no-cache krb5-libs
 WORKDIR /app
 COPY --from=build /app .
 USER $APP_UID

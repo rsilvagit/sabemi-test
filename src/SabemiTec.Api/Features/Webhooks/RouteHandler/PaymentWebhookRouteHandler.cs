@@ -1,7 +1,6 @@
 using System.Text.Json;
 using SabemiTec.Api.ACL.PartnerBank.DTO;
 using SabemiTec.Api.Configurations.RateLimiting;
-using SabemiTec.Api.Features.Dashboard.RouteHandler;
 using SabemiTec.Api.Features.Webhooks.DTO;
 using SabemiTec.Api.Features.Webhooks.Services;
 
@@ -24,16 +23,6 @@ public static class PaymentWebhookRouteHandler
             .Produces(StatusCodes.Status202Accepted)
             .Produces(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
-            .Produces(StatusCodes.Status401Unauthorized)
-            .Produces(StatusCodes.Status429TooManyRequests)
-            .WithOpenApi();
-
-        // Same handler as GET /api/payments/contracts (DashboardRouteHandler): lets
-        // SabemiTec.LoadSimulator look up real contract ids to post consistent synthetic
-        // payments, without needing Dashboard:ApiKey for a single auxiliary read.
-        group.MapGet("/contracts", DashboardRouteHandler.GetContractIdsAsync)
-            .WithName("ListContractIdsForWebhookCaller")
-            .Produces(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status429TooManyRequests)
             .WithOpenApi();

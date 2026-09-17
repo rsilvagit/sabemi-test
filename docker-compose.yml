@@ -83,6 +83,10 @@ services:
       # `docker compose up` (no --profile simulator) too. Left empty, the container itself
       # (only started when the profile is active) fails fast with a clear message instead.
       WEBHOOK_API_KEY: ${STG_WEBHOOK_API_KEY:-}
+      # Optional: reads the `contract` table directly instead of calling the API (this is a
+      # simulator talking to its own test/demo DB, not a real partner bank). Left empty, the
+      # worker falls back to a fixed contract list and keeps working.
+      DB_CONNECTION_STRING: ${STG_DB_CONNECTION_STRING:-}
       INTERVAL_SECONDS: ${LOAD_SIMULATOR_INTERVAL_SECONDS:-25}
       CONCURRENT_REQUESTS: ${LOAD_SIMULATOR_CONCURRENCY:-5}
 

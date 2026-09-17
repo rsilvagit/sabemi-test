@@ -33,16 +33,19 @@ depois — processamento assíncrono em background.
 ### Carga sintética (opcional)
 
 `SabemiTec.LoadSimulator` simula o banco parceiro: dispara lotes de transações concorrentes
-contra `POST /webhooks/payment`, usando contratos reais buscados em `GET /webhooks/contracts`.
+contra `POST /webhooks/payment`, usando contratos reais lidos direto da tabela `contract`
+(é o próprio banco de teste/demo, não um parceiro real — ver `DB_CONNECTION_STRING` abaixo).
 
 ```bash
 STG_WEBHOOK_API_KEY=<Webhook__ApiKey real do sabemi-api> \
+STG_DB_CONNECTION_STRING=<connection string do Supabase, opcional> \
   docker compose --profile simulator up -d --build
 ```
 
 Por padrão aponta pra API de staging no Render; `LOAD_SIMULATOR_API_URL=http://api:8080` mira
 na API local. `LOAD_SIMULATOR_INTERVAL_SECONDS` e `LOAD_SIMULATOR_CONCURRENCY` ajustam o
-volume. `docker compose --profile simulator down` desliga.
+volume. `docker compose --profile simulator down` desliga. Sem `STG_DB_CONNECTION_STRING`, cai
+na lista fixa de contratos de fallback — o worker continua funcionando normalmente.
 
 ## Stack
 
@@ -138,8 +141,8 @@ dashboard (`120 req/min/IP` — tráfego de polling humano).
 
 **Contratos como dado de referência.** Tabela `contract` (seed manual, migrations
 `0002`-`0004`) enriquece o detalhamento do dashboard (tipo, parcelas, valor total) via
-`LEFT JOIN` — não vem do payload do webhook. `GET /api/payments/contracts` (dashboard) e
-`GET /webhooks/contracts` (worker, mesma chave do webhook) expõem a mesma lista.
+`LEFT JOIN` — não vem do payload do webhook. `GET /api/payments/contracts` expõe essa lista
+pro dashboard; o `LoadSimulator` lê a mesma tabela direto do banco, sem passar pela API.
 
 **DI centralizado.** `Configurations/Extensions/ServicesExtensions.cs` concentra um método
 `AddX` por área, encadeado fluentemente no `Program.cs`.
@@ -265,7 +268,7 @@ src/SabemiTec.Api/
 ├── ACL/PartnerBank/        # fronteira com o payload do banco parceiro
 ├── Enum/                   # enums-como-classe (Enumeration + derivados)
 ├── Features/
-│   ├── Webhooks/           # POST /webhooks/payment, GET /webhooks/contracts
+│   ├── Webhooks/           # POST /webhooks/payment
 │   ├── Processing/         # worker: claim, delay, upsert, retry/dead-letter
 │   └── Dashboard/          # GET /api/payments(/stats|/contracts|/{id}|/invalid)
 ├── Database/PostgreSQL/    # IUnitOfWork, Dapper, SQL, migrations (DbUp)

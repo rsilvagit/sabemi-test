@@ -36,8 +36,10 @@ public static class DashboardRouteHandler
             .Produces(StatusCodes.Status429TooManyRequests)
             .WithOpenApi();
 
-        // Feeds the "Todos os contratos" filter dropdown in the dashboard UI. Also mapped at
-        // GET /webhooks/contracts for SabemiTec.LoadSimulator — see that handler for why.
+        // Feeds the "Todos os contratos" filter dropdown in the dashboard UI.
+        // SabemiTec.LoadSimulator used to call this too, before it started reading the
+        // `contract` table directly (a simulator hitting its own test/demo DB, not a real
+        // partner bank) — see src/SabemiTec.LoadSimulator/Program.cs.
         group.MapGet("/contracts", GetContractIdsAsync)
             .WithName("ListContractIds")
             .Produces(StatusCodes.Status200OK)
@@ -89,10 +91,7 @@ public static class DashboardRouteHandler
         return Results.Ok(new PaymentStatsDto(stats.Total, stats.Success, stats.Error, stats.Pending));
     }
 
-    // Internal, not private: also mapped at GET /webhooks/contracts (PaymentWebhookRouteHandler)
-    // for SabemiTec.LoadSimulator, which needs real contract ids but has no business holding
-    // Dashboard:ApiKey — same handler, same data, exposed under whichever key fits the caller.
-    internal static async Task<IResult> GetContractIdsAsync(IPaymentQueryRepository repository, CancellationToken ct)
+    private static async Task<IResult> GetContractIdsAsync(IPaymentQueryRepository repository, CancellationToken ct)
     {
         var contracts = await repository.ListContractsAsync(ct);
         return Results.Ok(contracts.Select(c => new ContractDto(c.ContractId, c.ContractType, c.Installments, c.TotalValue)).ToList());
