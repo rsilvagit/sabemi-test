@@ -3,6 +3,11 @@
 Serviço que recebe notificações de pagamento de um banco parceiro, garante que nenhuma seja
 processada duas vezes, processa em background e exibe o resultado num painel administrativo.
 
+## Em produção (demo)
+
+- **Dashboard**: https://sabemi-web.onrender.com
+- **API**: https://sabemi-api.onrender.com (`/health` pra status — Swagger só existe em `Development`, não roda em produção)
+
 ## Como rodar
 
 Pré-requisito: Docker Desktop.
